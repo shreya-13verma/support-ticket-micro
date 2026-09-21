@@ -14,7 +14,7 @@
    Do not skip the human review gate in Step 3.
    ```
 4. Hermes will produce a `plan.md` **and a `task.md`** and **stop and wait for your approval** before writing any code. Review both, request changes if needed, approve when ready.
-5. From there, Hermes implements phase by phase, checking off tasks in `task.md` as it completes and validates each one, documents each phase, handles testing, and (if you've granted it access) manages git/GitHub for you.
+5. From there, Hermes initializes version control, implements phase by phase, checking off tasks in `task.md` as it completes and validates each one, performs automated backend and browser testing, writes industry-grade documentation, and pushes to your remote GitHub repository.
 
 ---
 
@@ -49,6 +49,12 @@
                                     │  └───────────────┘
                                     ▼
                          ┌─────────────────────┐
+                         │  Step 3.1: GitHub    │
+                         │  Setup & Auth Gate   │
+                         │  (repo, token, info) │
+                         └──────────┬───────────┘
+                                    ▼
+                         ┌─────────────────────┐
                          │  Step 4: Implement   │
                          │  phase by phase      │◄────┐
                          │  (Loop Engineering:  │     │ fail
@@ -64,19 +70,21 @@
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 6: Phase Doc   │
-                    │    │  (docs/PHASE_*.md)   │
+                    │    │  Step 6: Industry-   │
+                    │    │  Grade Documentation│
+                    │    │  (README, API Docs) │
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 7: Git/GitHub  │
-                    │    │  branch → PR → CI    │
-                    │    │  → merge             │
+                    │    │  Step 7: Git Push &  │
+                    │    │  GitHub Automation   │
+                    │    │  (sync repo & push)  │
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 8: Deploy +    │
-                    │    │  Verify → give URL   │
+                    │    │  Step 8: Deploy &    │
+                    │    │  Browser E2E Verify  │
+                    │    │  (Playwright checks) │
                     │    └──────────┬───────────┘
                     │               ▼
                     │      more phases remaining?
@@ -146,6 +154,27 @@ Immediately after `plan.md` is drafted (and before presenting either file at the
 - If changes are requested: revise the relevant sections of `plan.md` and the corresponding tasks in `task.md`, re-present both, and ask again.
 - Repeat until you receive an explicit approval. **No phase of Step 4 begins without this.**
 
+---
+
+## Step 3.1 — GitHub Setup & Authentication Gate (MANDATORY)
+
+Immediately after receiving approval in Step 3 and before scaffolding any phase:
+1. **Request GitHub Target & Credentials:**
+   Prompt the human:
+   ```
+   Please confirm your GitHub target repository (<owner>/<repo>) and ensure
+   your fine-grained GITHUB_TOKEN is exported as an environment variable in your session.
+   ```
+2. **Repository Existence & Metadata Setup:**
+   - Verify if the repository exists via GitHub API (`GET /repos/<owner>/<repo>`).
+   - If not found, create it via GitHub API (`POST /user/repos`).
+   - Populate the repository **Description** (`PATCH /repos/<owner>/<repo>`) with a concise summary of the application.
+   - Set relevant repository **Topics** (`PUT /repos/<owner>/<repo>/topics`) representing the tech stack (e.g. `fastapi`, `react`, `typescript`, `postgresql`).
+3. **Local Git Setup:**
+   - Initialize git, configure user name/email, create a standard `.gitignore`, and set `origin` to the target repository URL using OAuth/Token authentication.
+
+---
+
 ## Step 4 — Implementation, Phase by Phase
 
 - Follow the phases listed in plan.md Section 23 (Implementation Plan), in order.
@@ -158,81 +187,113 @@ Immediately after `plan.md` is drafted (and before presenting either file at the
 - As each individual task in that phase passes validation, mark it `- [x]` in `task.md` right away (see Step 2.1) — do not wait until the whole phase finishes to update it.
 - Do not move to the next phase until the current one is done and `task.md` reflects that every task in it is checked off.
 
+---
+
 ## Step 5 — Multi-Developer Collaboration & Merge Handling
 
-When more than one developer (each possibly running their own Hermes session) works on the same application:
-
-1. **`plan.md` is the shared contract.** Both developers' Hermes sessions read the same `plan.md`. Sections 5–8 (Architecture, Tech Decisions, API Contract, Data Model) are binding — if a developer's work requires deviating from them, `plan.md` must be updated and re-approved by the human **before** implementation continues, so the two branches don't silently diverge.
+When more than one developer works on the same application:
+1. **`plan.md` is the shared contract.**
 2. **Branch isolation.** Each developer works on their own branch (`feature/<name>-<task>`), never directly on `main`.
-3. **Before merging a branch, run a Merge-Readiness Loop:**
-   - Pull the latest `main` into the feature branch (merge or rebase).
-   - Re-run the **full test suite** against the merged result — not just the feature branch's own tests. A feature can pass alone and still break the combined codebase.
-   - **Classify any conflicts:**
-     - *Textual, non-overlapping logic* (e.g., two unrelated functions changed in the same file) → Hermes resolves automatically, re-runs tests to confirm, and logs the resolution.
-     - *Semantic conflicts* (both developers changed the same function, the same API contract, or overlapping logic) → Hermes does **not** auto-resolve. It presents both versions side by side, explains what each does, and asks a human to decide. Implementation does not continue until a decision is made.
-   - Only after tests pass on the merged result does the branch become mergeable.
-4. **Merge via Pull Request, not direct push to `main`** (see Step 7 for exact merge policy).
-5. After any merge, create a `docs/MERGE_<date>_<branches>.md` log: which branches were merged, what conflicts were found, how each was resolved, and the post-merge test results.
+3. **Run Merge-Readiness Loop:** Rebase/merge main, run full test suite, resolve textual conflicts, escalate semantic conflicts to a human.
+4. **Log Merge:** Record resolutions in `docs/MERGE_<date>_<branches>.md`.
 
-## Step 6 — Phase Documentation
+---
 
-After finishing each phase (Step 4) or each merge (Step 5), create a file:
-`docs/PHASE_<number>_<short-name>.md` or `docs/MERGE_<date>_<branches>.md`, containing:
+## Step 6 — Industry-Grade Documentation Deliverables (MANDATORY)
 
-- **What was implemented** in this phase (or what was merged).
-- **Loop Engineering log** — every fix attempted, what failed, what changed, how many iterations it took.
-- **Tests run and results** — broken out by type: unit, integration, API, security, performance, edge case — referencing the Test Case IDs (TC-xxx) from `plan.md` Section 15.
-- **Any conflicts and resolutions** (merge docs only).
+Every completed project MUST produce and commit the following three documentation tiers:
 
-## Step 7 — Version Control & GitHub Automation
+1. **Root `README.md`:**
+   - Visual architecture ASCII/Mermaid diagram showing components, databases, queues, and ports.
+   - Component & Service Port Inventory table.
+   - Role-Based Access Control matrix.
+   - Quickstart Guide via Docker Compose (`docker compose up -d --build`).
+   - Local Development Guide (virtualenv setup, running microservices and frontend locally).
+   - Automated Test execution commands (`pytest`, typecheck, security scans, frontend build).
+   - Links to all phase documentation files.
 
-### 7.0 — GitHub Authentication: When and How
+2. **`docs/APPLICATION_DOCUMENTATION.md` (Production Technical Specification):**
+   - Comprehensive API Reference for every microservice/endpoint with request/response examples and auth rules.
+   - Microservice boundaries, database isolation, and inter-service communication protocols.
+   - Domain Data Models, constraints, and entity relationships.
+   - State transition machine diagrams and lifecycle transition rules.
+   - Background tasks, scheduler intervals, and event-driven workflows (e.g. SLA engine).
+   - Error handling, status code conventions, and graceful degradation behaviors.
 
-- **When to give credentials:** only after `plan.md` is approved (Step 3), right before Step 4 implementation begins. Hermes doesn't need repo write access while the plan is still being drafted or reviewed — there's nothing to commit yet.
-- **How:** use a fine-grained, repo-scoped GitHub Personal Access Token (or a GitHub App installation) limited to this one repository, with only the scopes actually needed — `Contents` (read/write), `Pull requests` (read/write), and `Workflows` (only if Hermes needs to add/edit CI files). Do not grant org-wide or admin scope. Set an expiration on the token.
-- **Never paste the token directly into chat.** Set it as an environment variable (e.g., `GITHUB_TOKEN`) in the shell/session Hermes runs in. Hermes must never print, log, or commit the token anywhere, and must treat it as a secret per the same rules as any other credential.
-- Before starting implementation, have Hermes confirm it can authenticate (e.g., a test push to a throwaway branch) so auth problems surface before real work is at stake.
+3. **`docs/PHASE_<number>_<short-name>.md`:**
+   - Implementation summary for each completed phase.
+   - Loop Engineering log (diagnoses, fixes, iterations).
+   - Test results matrix referencing specific Test Case IDs (`TC-xxx`).
 
-**Prompt to Use — Granting GitHub Access:**
-```
-I'm giving you GitHub push access for this project.
-Repo: <owner/repo>
-I've set the token as an environment variable named GITHUB_TOKEN — don't
-ask me to paste it in chat, and never print it, log it, or commit it
-anywhere.
+---
 
-Use it only to: create branches, push commits, open PRs, and merge only
-per the policy below (PR + green CI required; autonomous merge only if
-I've explicitly enabled it).
+## Step 7 — Git Automation & Remote Sync
 
-Confirm you can authenticate — push a commit to a throwaway test branch
-and confirm it appears on GitHub — before starting real implementation.
-```
+- Keep local repository cleanly committed referencing phase numbers (e.g. `feat(phase-2): user auth`).
+- Push all branches and documentation to the remote repository on GitHub:
+  ```bash
+  git push -u origin main
+  ```
+- If working with feature branches, open Pull Requests against `main`. Never force-push or rewrite merged history.
 
-### 7.1 — Automation Policy
-
-Default policy (recommended — adjust only with explicit human instruction):
-
-- Hermes may push freely to `feature/*` branches and open Pull Requests automatically.
-- `main` is protected: merges require (a) CI fully green — lint, unit, integration, security scan, and (b) either explicit human approval on the PR, or, only if the human has explicitly set `autonomous-merge: true` for this project, Hermes may self-merge once CI is fully green — but must still write the merge doc from Step 5.5 and must never do this for changes touching auth, payments, secrets, or data-deletion logic without a human review regardless of the setting.
-- Hermes never force-pushes to `main`, never deletes a branch with unmerged commits without confirming with the human first, and never rewrites merged history.
-- Every commit message should reference the phase or feature it implements (e.g., `feat(phase-2): add user auth endpoints`).
+---
 
 ## Step 8 — Deployment & Verification
 
-- Deploy per `plan.md` Section 17 (Deployment).
-- Run the Post-Implementation Verification checks from Section 25 (smoke tests, health checks, metrics/log verification, regression tests) before declaring the deployment done.
-- Give the human the **live URL** to verify directly, along with a short summary of what was just deployed and which phase docs cover it.
-- If any post-deployment check fails, do not consider the phase complete — treat it as a failure and re-enter the Loop Engineering cycle (Step 4) before re-announcing readiness.
+- Deploy per `plan.md` Section 17 (Docker Compose / container orchestration).
+- Run post-implementation health checks and verification tests.
+- Give the human the **live URL** to verify directly.
 
-### 8.1 — Frontend Browser Verification (Playwright) — Explicit Opt-In Only
+### 8.1 — Frontend Browser Verification (Playwright / E2E)
 
-- Hermes must **not** automatically launch a browser or use Playwright to visually check the frontend as part of normal phase completion, testing (Section 14), or the deployment verification above. The automated test suite (unit/integration/E2E per Section 14/15) is the default and sufficient verification method.
-- Browsing a live URL with Playwright is a separate, heavier action Hermes may only take **when the human explicitly asks for it** — e.g., "open the URL and check the frontend," "verify the deployed page looks right," "browse to `<url>` and confirm X is visible." An unprompted "looks good, let me also check it in a browser" is not permitted.
-- This applies every time — a prior request to browse does not carry forward to future phases; ask again if needed.
+- When the application includes a frontend, Hermes MUST execute automated end-to-end browser verification against the running frontend using Playwright or `@playwright/test` / Vitest Browser mode.
+- E2E browser checks must verify:
+  1. Login & Registration flow and token persistence.
+  2. Route protection (unauthenticated redirects).
+  3. Core functional flow (e.g. raising a ticket, viewing list, posting comments, switching status).
+  4. Role-gated views (Admin controls and Reports charts visible only to authorized roles).
+- Confirm that no unhandled client-side JavaScript errors or broken network requests occur during the session.
+
+---
+
+## Step 9 — Adding a New Feature Later
+
+When adding features after initial delivery:
+1. Update `plan.md` (FRs, TCs, architecture diffs) and `task.md`.
+2. Present diff to human for approval.
+3. Implement via Loop Engineering.
+4. Run full regression suite + Playwright E2E browser tests.
+5. Update `APPLICATION_DOCUMENTATION.md` and `README.md`.
+6. Push to remote repository and present live verification URL.
 
 ---
 
 # APPENDIX A — plan.md Template
 
-*(See HERMES-MANUAL.md standard specification template)*
+*(Standard specification template per HERMES-MANUAL.md)*
+
+---
+
+# APPENDIX B — Loop Engineering (Reference)
+
+**Propose → Validate → Diagnose → Refine → Converge** (Max 5 attempts before reporting blocker).
+
+---
+
+# APPENDIX C — Quick Checklist
+
+- [ ] `prd.md` provided
+- [ ] `plan.md` and `SYSTEM-PLAN.md` (if microservices) generated
+- [ ] `plan.md` Section 5 includes concrete Directory Structure
+- [ ] `plan.md` Section 8 contains NO JSON/JSONB columns (strictly typed)
+- [ ] `task.md` generated with granular checkboxes mapped to FRs and TCs
+- [ ] **Human review gate (Step 3) explicitly approved**
+- [ ] **GitHub repository initialized with Description, Topics, and remote tracking (Step 3.1)**
+- [ ] Each phase implemented via Loop Engineering and tasks checked off in `task.md`
+- [ ] Static security scan executed (e.g. Bandit / npm audit)
+- [ ] **Automated Playwright / E2E browser test executed for frontend flows (Step 8.1)**
+- [ ] **Industry-grade root `README.md` created with architecture and run commands (Step 6)**
+- [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full API and technical spec (Step 6)**
+- [ ] Phase documentation (`docs/PHASE_*.md`) written for each phase
+- [ ] **All code and docs committed and pushed to remote GitHub repository (Step 7)**
+- [ ] Live deployment verified with working URL handed to human
