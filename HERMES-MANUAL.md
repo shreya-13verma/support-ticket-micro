@@ -29,8 +29,8 @@
                          ┌─────────────────────┐
                          │  Step 2: Generate    │
                          │  plan.md (Appendix A)│
+                         │  + Full User Stories │
                          │  + Loop Engineering  │
-                         │  self-check          │
                          └──────────┬───────────┘
                                     ▼
                          ┌─────────────────────┐
@@ -84,8 +84,8 @@
                     │               ▼
                     │    ┌─────────────────────┐
                     │    │  Step 8: Deploy +    │
-                    │    │  Browser Verification│
-                    │    │  (Playwright E2E)    │
+                    │    │  Browser & User      │
+                    │    │  Story Verification  │
                     │    └──────────┬───────────┘
                     │               ▼
                     │      more phases remaining?
@@ -123,7 +123,8 @@ Use the exact template in **Appendix A** below. Do not omit sections — if a se
 
 **Rules while drafting plan.md:**
 - `plan.md` is a **specification + constraints + verification contract** — not just an implementation checklist. Every Functional Requirement (Section 2) must map to at least one Test Case (Section 15). Every Non-Functional Requirement must map to a concrete, checkable target (not "should be fast" — a number).
-- Apply **Loop Engineering** (Appendix B) while drafting: propose the full draft → self-check consistency (does every FR have a test case? does the architecture match the tech decisions? do edge cases in Section 16 appear as test cases in Section 15?) → fix gaps → repeat until consistent.
+- **Mandatory User Stories & Complete Lifecycle Scenarios (Section 2.1):** Every feature introduced must have end-to-end user stories covering the complete user journey and all edge cases (e.g. creating, viewing, updating, listing, downloading, deleting, permission denials, and offline degradation). Features must never be partially designed (e.g. if file upload is added, file listing, viewing, downloading, size limits, format restrictions, and deletion must also be specified).
+- Apply **Loop Engineering** (Appendix B) while drafting: propose the full draft → self-check consistency (does every FR and User Story have a test case? does the architecture match the tech decisions? do edge cases in Section 16 appear as test cases in Section 15?) → fix gaps → repeat until consistent.
 - Fill Section 26 (Existing Codebase Analysis) by actually scanning the current repo if one exists — don't assume a greenfield project.
 - If the project includes a UI, Section 5's **Frontend Plan** subsection is mandatory, not optional — do not leave it blank or assume it's covered by the backend architecture. Section 14/15 must then include both Backend and Frontend test coverage (unit, integration, API/E2E, security/accessibility, performance/responsive, failure/error states) — a backend-only test plan is incomplete for any project with a UI.
 - Section 5's **Project Directory Structure** subsection is mandatory for every project (greenfield or existing). Lay out the actual folder/file tree Hermes will create or is working within (down to the key files — entry points, config, routes/controllers, models, components, tests, docs), not just a description in prose. For an existing codebase, this must reflect Section 26's findings, not a generic template.
@@ -137,7 +138,7 @@ Immediately after `plan.md` is drafted (and before presenting either file at the
 **Rules for `task.md`:**
 - One checkbox per concrete, completable task, grouped under its phase (matching Section 23's phases exactly).
 - Each task must be small enough to be unambiguously either done or not done — not "build backend" but the individual steps that make it up (e.g., "create User model", "implement POST /login endpoint", "write TC-001 test").
-- Derive tasks so that, taken together, they cover every Functional Requirement, every Test Case (Section 15), and every Definition of Done item (Section 24) — nothing in the plan should exist with no corresponding task.
+- Derive tasks so that, taken together, they cover every Functional Requirement, every User Story Scenario, every Test Case (Section 15), and every Definition of Done item (Section 24) — nothing in the plan should exist with no corresponding task.
 - Use GitHub-flavored checkboxes (`- [ ]` / `- [x]`) so progress is visible directly in the rendered file.
 - Present `task.md` alongside `plan.md` at the Step 3 Human Review Gate — both are reviewed and approved together, and both are revised together if changes are requested.
 - Use the exact structure in **Appendix E**.
@@ -181,7 +182,7 @@ Immediately after receiving approval in Step 3 and before scaffolding any implem
 - Follow the phases listed in plan.md Section 23 (Implementation Plan), in order.
 - For each phase, apply the **Loop Engineering cycle** (Appendix B):
   1. Build the phase's scope.
-  2. Validate — run every test type relevant to that phase (unit, integration, API, security, performance, edge cases — pull the specific cases from Section 15/16 that apply to this phase).
+  2. Validate — run every test type relevant to that phase (unit, integration, API, security, performance, edge cases, and end-to-end user story walkthroughs).
   3. If anything fails: read the exact failure, fix it, re-run the same check.
   4. Repeat up to 5 times. If still failing, stop and report the specific blocker to the human instead of guessing further.
 - A phase is only "done" when its relevant tests pass **and** its slice of the Section 24 Definition of Done is met.
@@ -232,7 +233,7 @@ Every project MUST produce and maintain the following documentation artifacts:
 3. **`docs/PHASE_<number>_<short-name>.md`:**
    - Summary of features and components implemented in each phase.
    - Loop Engineering log (diagnoses, fixes, iterations).
-   - Test results broken out by type (unit, integration, API, security, performance, edge case), referencing Test Case IDs (`TC-xxx`).
+   - Test results broken out by type (unit, integration, API, security, performance, edge case, and user stories), referencing Test Case IDs (`TC-xxx`).
 
 ---
 
@@ -255,32 +256,33 @@ Default policy:
 
 ---
 
-## Step 8 — Deployment & Browser Verification
+## Step 8 — Deployment & Verification
 
 - Deploy per `plan.md` Section 17.
 - Run the Post-Implementation Verification checks from Section 25 (smoke tests, health checks, metrics/log verification, regression tests).
 - Give the human the **live URL** to verify directly, along with a short summary of what was deployed.
 
-### 8.1 — Frontend Browser E2E Verification (Playwright) — Mandatory when UI is present
+### 8.1 — Frontend Browser E2E Verification & User Story Testing (Mandatory when UI is present)
 
-- When the project includes a user interface, Hermes MUST execute automated end-to-end browser verification against the running frontend using Playwright (or `@playwright/test` / Vitest Browser Mode).
-- Automated browser journeys must verify:
+- When the project includes a user interface, Hermes MUST execute automated end-to-end browser verification against the running application using Playwright (or `@playwright/test` / Vitest Browser Mode) and live user-story automation scripts.
+- Automated tests must cover all user journeys and every possible scenario:
   1. Authentication & registration flows and session persistence.
   2. Route protection and unauthenticated redirect behaviors.
-  3. Primary user journeys and form submission flows end-to-end.
-  4. Role-gated controls and permission views across roles.
-  5. Absence of unhandled browser console errors or broken network requests.
-- Report observed browser test results in the phase documentation.
+  3. Complete feature lifecycles (e.g., creating, viewing, editing, listing, interacting, uploading/downloading files, transitioning states).
+  4. Role-gated controls and permission views across all user roles.
+  5. Negative scenarios (validation failures, forbidden actions, offline service graceful degradation).
+  6. Absence of unhandled browser console errors or broken network requests.
+- Report observed browser test and user story results in the phase documentation.
 
 ---
 
 ## Step 9 — Adding a New Feature Later
 
 When the human wants to add a feature after the initial build:
-1. **Update `plan.md`, not a separate file** — add new Functional Requirements, Test Cases, Edge Cases, and update Architecture/Data Model/API Contract if touched. Add a new phase under Section 23.
+1. **Update `plan.md`, not a separate file** — add new Functional Requirements, User Stories, Test Cases, Edge Cases, and update Architecture/Data Model/API Contract if touched. Add a new phase under Section 23.
 2. **Re-run the Human Review Gate (Step 3)** for just the new/changed sections.
 3. **Implement the new phase** using the Loop Engineering cycle (Step 4).
-4. **Run full regression** — both backend test suite and Playwright browser E2E tests.
+4. **Run full regression** — both backend test suite and Playwright browser / user story E2E tests.
 5. **Update documentation** (`APPLICATION_DOCUMENTATION.md`, `README.md`, and create `docs/PHASE_*.md`).
 6. **Branch, PR, merge** following Step 7.
 7. **Deploy and re-verify** (Step 8) — give human updated URL.
@@ -318,7 +320,101 @@ Add Consumer-Driven Contract Tests to Section 14/15.
 
 # APPENDIX A — plan.md Template
 
-*(See standard specification template)*
+*(This is the exact structure Hermes must produce in Step 2. Fill every section based on prd.md; mark unknowns as Open Questions in Section 22 rather than guessing.)*
+
+```markdown
+# PLAN.md
+
+## 1. Overview
+- Project / feature name
+- Problem statement
+- Goal
+- Non-goals
+- Success criteria
+
+## 2. Requirements
+### Functional Requirements
+- FR-001:
+- FR-002:
+- FR-003:
+
+### User Stories & Complete Lifecycle Scenarios
+- US-001 (Actor): As a [role], I want to [action] so that [benefit].
+  - Scenario A (Happy Path): [Given / When / Then]
+  - Scenario B (Edge / Negative Path): [Given / When / Then]
+- US-002 (Actor): ...
+
+### Non-Functional Requirements
+- Performance
+- Scalability
+- Availability
+- Reliability
+- Security
+- Observability
+- Maintainability
+
+## 3. Scope
+### In Scope
+### Out of Scope
+
+## 4. User / System Flows
+- Main user flow
+- Error flows
+- Edge cases
+- State transitions
+
+## 5. Architecture
+- Components
+- Services
+- Dependencies
+- Data flow
+- External integrations
+- Architecture diagram
+
+### Project Directory Structure (required for every project)
+- The actual folder/file tree Hermes will create or is working within.
+
+### Frontend Plan (required whenever the project has a UI)
+- Pages / screens / routes
+- Component hierarchy
+- State management approach
+- Client-server data flow
+- Styling approach
+- Navigation guards & accessibility
+
+## 6. Technology Decisions
+- Language, Framework, Database, Cache, Queue, Libraries, Rationale
+
+## 7. API / Interface Contract
+- Endpoints, Request/Response Schemas, Auth, Error Responses
+
+## 8. Data Model
+- Entities, Relationships, Indexes, Constraints
+- **JSON/JSONB constraint:** No JSON/JSONB schemaless columns unless prd.md explicitly requires one.
+
+## 9. Security
+- Auth, RBAC, input validation, encryption, secret management
+
+## 10. Scalability
+## 11. Performance
+## 12. Error Handling & Resilience
+## 13. Observability
+## 14. Testing Strategy (Backend, Frontend, Contract, User Stories)
+## 15. Test Cases & User Story Verification Matrix
+## 16. Edge Cases
+## 17. Deployment
+## 18. CI/CD
+## 19. Compatibility
+## 20. Migration / Upgrade Plan
+## 21. Risks & Trade-offs
+## 22. Open Questions
+## 23. Implementation Plan
+## 24. Definition of Done
+## 25. Post-Implementation Verification
+## 26. Existing Codebase Analysis
+## 27. Implementation Constraints
+## 28. Acceptance Criteria
+```
 
 ---
 
@@ -331,7 +427,7 @@ Add Consumer-Driven Contract Tests to Section 14/15.
 # APPENDIX C — Quick Checklist
 
 - [ ] `prd.md` provided
-- [ ] `plan.md` generated per Appendix A, every FR mapped to a test case
+- [ ] `plan.md` generated per Appendix A with **comprehensive User Stories for all lifecycle scenarios**
 - [ ] `plan.md` Section 5 includes a concrete Project Directory Structure (not just prose)
 - [ ] `plan.md` Section 8 has no JSON/JSONB fields unless `prd.md` explicitly required them
 - [ ] `task.md` generated per Appendix E, derived from `plan.md` Section 23
@@ -339,11 +435,11 @@ Add Consumer-Driven Contract Tests to Section 14/15.
 - [ ] **GitHub repository initialized with Description, Topics, and remote tracking configured (Step 3.1)**
 - [ ] Each phase implemented via Loop Engineering cycle, tests passing before moving on, tasks checked off in `task.md`
 - [ ] **Industry-grade root `README.md` created with architecture diagrams and run commands (Step 6)**
-- [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full technical and API specs (Step 6)**
+- [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full technical, API, and domain specs (Step 6)**
 - [ ] Phase doc created after each phase in `docs/PHASE_*.md`
 - [ ] Multi-developer branches merged only after full-suite re-validation
 - [ ] `main` protected — PR + green CI required
-- [ ] **Automated Playwright browser E2E verification executed if project has a UI (Step 8.1)**
+- [ ] **Automated Playwright browser E2E and complete User Story verification executed if project has a UI (Step 8.1)**
 - [ ] **All code and documentation committed and pushed to remote GitHub repository (Step 7)**
 - [ ] Deployment verified and URL handed to the human
 
