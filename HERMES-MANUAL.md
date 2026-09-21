@@ -55,6 +55,12 @@
                          └──────────┬───────────┘
                                     ▼
                          ┌─────────────────────┐
+                         │  Step 3.2: Domain &  │
+                         │  Operational Params  │
+                         │  Clarification Gate  │
+                         └──────────┬───────────┘
+                                    ▼
+                         ┌─────────────────────┐
                          │  Step 4: Implement   │
                          │  phase by phase      │◄────┐
                          │  (Loop Engineering:  │     │ fail
@@ -123,7 +129,7 @@ Use the exact template in **Appendix A** below. Do not omit sections — if a se
 
 **Rules while drafting plan.md:**
 - `plan.md` is a **specification + constraints + verification contract** — not just an implementation checklist. Every Functional Requirement (Section 2) must map to at least one Test Case (Section 15). Every Non-Functional Requirement must map to a concrete, checkable target (not "should be fast" — a number).
-- **Mandatory User Stories & Complete Lifecycle Scenarios (Section 2.1):** Every feature introduced must have end-to-end user stories covering the complete user journey and all edge cases (e.g. creating, viewing, updating, listing, downloading, deleting, permission denials, and offline degradation). Features must never be partially designed (e.g. if file upload is added, file listing, viewing, downloading, size limits, format restrictions, and deletion must also be specified).
+- **Mandatory User Stories & Complete Lifecycle Scenarios (Section 2.1):** Every capability, entity, or feature introduced must be modeled as complete user journeys covering the entire functional lifecycle (creation, discovery/listing, detail inspection, modification, consumption, state transitions, edge cases, and failure modes). Never implement half-lifecycle features (e.g., if data or assets are stored/created, retrieval, viewing, consumption, and boundary limits must also be designed and supported).
 - Apply **Loop Engineering** (Appendix B) while drafting: propose the full draft → self-check consistency (does every FR and User Story have a test case? does the architecture match the tech decisions? do edge cases in Section 16 appear as test cases in Section 15?) → fix gaps → repeat until consistent.
 - Fill Section 26 (Existing Codebase Analysis) by actually scanning the current repo if one exists — don't assume a greenfield project.
 - If the project includes a UI, Section 5's **Frontend Plan** subsection is mandatory, not optional — do not leave it blank or assume it's covered by the backend architecture. Section 14/15 must then include both Backend and Frontend test coverage (unit, integration, API/E2E, security/accessibility, performance/responsive, failure/error states) — a backend-only test plan is incomplete for any project with a UI.
@@ -174,6 +180,15 @@ Immediately after receiving approval in Step 3 and before scaffolding any implem
    - Set relevant repository **Topics** (`PUT /repos/<owner>/<repo>/topics`) representing the application's technologies and domain.
 3. **Local Git Setup:**
    - Initialize git, configure user name/email, create a standard `.gitignore`, and set `origin` to the target repository URL using token authentication.
+
+---
+
+## Step 3.2 — Domain & Operational Parameters Clarification Gate (MANDATORY)
+
+Immediately prior to starting Step 4 implementation, Hermes must inspect the planned system entities and operational features to identify any domain-specific business thresholds, retention rules, resource caps, or policy defaults that were not explicitly stated in `prd.md`.
+
+- **Proactive Clarification:** Present these specific domain choices to the human in a single, structured question list (e.g. data retention horizons, operational thresholds, capacity/resource limits, default system timeouts, or policy constants relevant to the application domain).
+- **Incorporate Answers:** Apply the human's specified operational parameters across configuration files, environment variables, validation schemas, and database default constraints before writing core feature code.
 
 ---
 
@@ -268,7 +283,7 @@ Default policy:
 - Automated tests must cover all user journeys and every possible scenario:
   1. Authentication & registration flows and session persistence.
   2. Route protection and unauthenticated redirect behaviors.
-  3. Complete feature lifecycles (e.g., creating, viewing, editing, listing, interacting, uploading/downloading files, transitioning states).
+  3. Complete feature lifecycles (creation, discovery, detail inspection, editing, deletion, interaction, resource consumption, state transitions).
   4. Role-gated controls and permission views across all user roles.
   5. Negative scenarios (validation failures, forbidden actions, offline service graceful degradation).
   6. Absence of unhandled browser console errors or broken network requests.
@@ -433,6 +448,7 @@ Add Consumer-Driven Contract Tests to Section 14/15.
 - [ ] `task.md` generated per Appendix E, derived from `plan.md` Section 23
 - [ ] **Human explicitly approved both `plan.md` and `task.md` before any code was written (Step 3)**
 - [ ] **GitHub repository initialized with Description, Topics, and remote tracking configured (Step 3.1)**
+- [ ] **Domain & operational parameters clarified with human before implementation starts (Step 3.2)**
 - [ ] Each phase implemented via Loop Engineering cycle, tests passing before moving on, tasks checked off in `task.md`
 - [ ] **Industry-grade root `README.md` created with architecture diagrams and run commands (Step 6)**
 - [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full technical, API, and domain specs (Step 6)**
