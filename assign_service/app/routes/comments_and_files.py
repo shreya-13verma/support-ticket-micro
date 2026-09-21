@@ -3,6 +3,7 @@ import shutil
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Dict, Any
@@ -139,6 +140,32 @@ async def list_attachments(
     query = select(Attachment).where(Attachment.ticket_id == ticket_id).order_by(Attachment.created_at.desc())
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+@router.get("/tickets/{ticket_id}/attachments/{attachment_id}/download")
+async def download_attachment(
+    ticket_id: int,
+    attachment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_claims)
+):
+    await TicketService.get_ticket(ticket_id, current_user, db)
+
+    query = select(Attachment).where(Attachment.id == attachment_id, Attachment.ticket_id == ticket_id)
+    result = await db.execute(query)
+    attachment = result.scalar_one_or_none()
+    if not attachment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+
+    file_path = str(attachment.file_path)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File on disk not found")
+
+    return FileResponse(
+        path=file_path,
+        filename=str(attachment.filename),
+        media_type=str(attachment.content_type)
+    )
 
 
 @router.get("/tickets/{ticket_id}/history", response_model=List[AuditLogOut])

@@ -4,7 +4,7 @@ import { assignClient, userClient } from '../api/client';
 import { Ticket, Comment, Attachment, User, TicketStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge, PriorityBadge } from '../components/Badges';
-import { ArrowLeft, Send, Paperclip, UserCheck, ShieldAlert, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, UserCheck, ShieldAlert, FileText, Download } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -103,6 +103,24 @@ export const TicketDetailPage: React.FC = () => {
       alert('Attachment uploaded successfully!');
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Attachment upload failed');
+    }
+  };
+
+  const handleDownload = async (attachmentId: number, filename: string) => {
+    try {
+      const res = await assignClient.get(`/tickets/${id}/attachments/${attachmentId}/download`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to download file');
     }
   };
 
@@ -286,12 +304,21 @@ export const TicketDetailPage: React.FC = () => {
             {attachments.length > 0 && (
               <div className="space-y-2 mb-3">
                 {attachments.map(att => (
-                  <div key={att.id} className="flex items-center space-x-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                    <FileText className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                    <div className="flex-1 truncate">
-                      <div className="font-medium text-slate-800 truncate" title={att.filename}>{att.filename}</div>
-                      <div className="text-[10px] text-slate-400">{(att.file_size / 1024).toFixed(1)} KB</div>
+                  <div key={att.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs hover:border-indigo-200 transition">
+                    <div className="flex items-center space-x-2 truncate flex-1 mr-2">
+                      <FileText className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                      <div className="truncate">
+                        <div className="font-medium text-slate-800 truncate" title={att.filename}>{att.filename}</div>
+                        <div className="text-[10px] text-slate-400">{(att.file_size / 1024).toFixed(1)} KB</div>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => handleDownload(att.id, att.filename)}
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition flex-shrink-0"
+                      title="Download file"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
