@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { assignClient, userClient } from '../api/client';
-import { Ticket, Comment, User, TicketStatus } from '../types';
+import { Ticket, Comment, Attachment, User, TicketStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge, PriorityBadge } from '../components/Badges';
-import { ArrowLeft, Send, Paperclip, UserCheck, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, UserCheck, ShieldAlert, FileText } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +13,7 @@ export const TicketDetailPage: React.FC = () => {
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [agents, setAgents] = useState<User[]>([]);
@@ -33,14 +34,16 @@ export const TicketDetailPage: React.FC = () => {
   const fetchTicketDetails = async () => {
     setLoading(true);
     try {
-      const [ticketRes, commentsRes] = await Promise.all([
+      const [ticketRes, commentsRes, attachmentsRes] = await Promise.all([
         assignClient.get(`/tickets/${id}`),
         assignClient.get(`/tickets/${id}/comments`),
+        assignClient.get(`/tickets/${id}/attachments`),
       ]);
       setTicket(ticketRes.data);
       setSelectedStatus(ticketRes.data.status);
       setSelectedAgent(ticketRes.data.assigned_to || '');
       setComments(commentsRes.data);
+      setAttachments(attachmentsRes.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load ticket');
     } finally {
@@ -93,13 +96,13 @@ export const TicketDetailPage: React.FC = () => {
     formData.append('file', file);
 
     try {
-      await assignClient.post(`/tickets/${id}/attachments`, formData, {
+      const res = await assignClient.post(`/tickets/${id}/attachments`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      alert('Attachment uploaded!');
-      fetchTicketDetails();
+      setAttachments(prev => [res.data, ...prev]);
+      alert('Attachment uploaded successfully!');
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Attachment failed');
+      alert(err.response?.data?.detail || 'Attachment upload failed');
     }
   };
 
@@ -278,6 +281,22 @@ export const TicketDetailPage: React.FC = () => {
           {/* Attachments Section */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-800">Attachments</h3>
+            
+            {/* Attachment List */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {attachments.map(att => (
+                  <div key={att.id} className="flex items-center space-x-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <FileText className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                    <div className="flex-1 truncate">
+                      <div className="font-medium text-slate-800 truncate" title={att.filename}>{att.filename}</div>
+                      <div className="text-[10px] text-slate-400">{(att.file_size / 1024).toFixed(1)} KB</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-4 cursor-pointer hover:bg-slate-50 transition">
                 <Paperclip className="w-6 h-6 text-slate-400 mb-1" />

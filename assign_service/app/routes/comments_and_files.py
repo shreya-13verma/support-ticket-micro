@@ -129,6 +129,18 @@ async def upload_attachment(
     return attachment
 
 
+@router.get("/tickets/{ticket_id}/attachments", response_model=List[AttachmentOut])
+async def list_attachments(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_claims)
+):
+    await TicketService.get_ticket(ticket_id, current_user, db)
+    query = select(Attachment).where(Attachment.ticket_id == ticket_id).order_by(Attachment.created_at.desc())
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
 @router.get("/tickets/{ticket_id}/history", response_model=List[AuditLogOut])
 async def get_ticket_history(
     ticket_id: int,
