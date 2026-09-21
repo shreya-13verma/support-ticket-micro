@@ -14,7 +14,7 @@
    Do not skip the human review gate in Step 3.
    ```
 4. Hermes will produce a `plan.md` **and a `task.md`** and **stop and wait for your approval** before writing any code. Review both, request changes if needed, approve when ready.
-5. From there, Hermes initializes version control, implements phase by phase, checking off tasks in `task.md` as it completes and validates each one, performs automated backend and browser testing, writes industry-grade documentation, and pushes to your remote GitHub repository.
+5. From there, Hermes implements phase by phase, checking off tasks in `task.md` as it completes and validates each one, documents each phase, handles testing, and (if you've granted it access) manages git/GitHub for you.
 
 ---
 
@@ -70,21 +70,22 @@
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 6: Industry-   │
-                    │    │  Grade Documentation│
-                    │    │  (README, API Docs) │
+                    │    │  Step 6: Phase &     │
+                    │    │  App Documentation   │
+                    │    │  (docs/PHASE_*.md,   │
+                    │    │   README.md, etc.)   │
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 7: Git Push &  │
-                    │    │  GitHub Automation   │
-                    │    │  (sync repo & push)  │
+                    │    │  Step 7: Git/GitHub  │
+                    │    │  branch → PR → CI    │
+                    │    │  → merge             │
                     │    └──────────┬───────────┘
                     │               ▼
                     │    ┌─────────────────────┐
-                    │    │  Step 8: Deploy &    │
-                    │    │  Browser E2E Verify  │
-                    │    │  (Playwright checks) │
+                    │    │  Step 8: Deploy +    │
+                    │    │  Browser Verification│
+                    │    │  (Playwright E2E)    │
                     │    └──────────┬───────────┘
                     │               ▼
                     │      more phases remaining?
@@ -158,20 +159,20 @@ Immediately after `plan.md` is drafted (and before presenting either file at the
 
 ## Step 3.1 — GitHub Setup & Authentication Gate (MANDATORY)
 
-Immediately after receiving approval in Step 3 and before scaffolding any phase:
+Immediately after receiving approval in Step 3 and before scaffolding any implementation code:
 1. **Request GitHub Target & Credentials:**
    Prompt the human:
    ```
-   Please confirm your GitHub target repository (<owner>/<repo>) and ensure
+   Please provide the target GitHub repository (<owner>/<repo>) and ensure
    your fine-grained GITHUB_TOKEN is exported as an environment variable in your session.
    ```
 2. **Repository Existence & Metadata Setup:**
    - Verify if the repository exists via GitHub API (`GET /repos/<owner>/<repo>`).
    - If not found, create it via GitHub API (`POST /user/repos`).
-   - Populate the repository **Description** (`PATCH /repos/<owner>/<repo>`) with a concise summary of the application.
-   - Set relevant repository **Topics** (`PUT /repos/<owner>/<repo>/topics`) representing the tech stack (e.g. `fastapi`, `react`, `typescript`, `postgresql`).
+   - Populate the repository **Description** (`PATCH /repos/<owner>/<repo>`) with a clear summary of the project.
+   - Set relevant repository **Topics** (`PUT /repos/<owner>/<repo>/topics`) representing the application's technologies and domain.
 3. **Local Git Setup:**
-   - Initialize git, configure user name/email, create a standard `.gitignore`, and set `origin` to the target repository URL using OAuth/Token authentication.
+   - Initialize git, configure user name/email, create a standard `.gitignore`, and set `origin` to the target repository URL using token authentication.
 
 ---
 
@@ -191,109 +192,169 @@ Immediately after receiving approval in Step 3 and before scaffolding any phase:
 
 ## Step 5 — Multi-Developer Collaboration & Merge Handling
 
-When more than one developer works on the same application:
-1. **`plan.md` is the shared contract.**
+When more than one developer (each possibly running their own Hermes session) works on the same application:
+
+1. **`plan.md` is the shared contract.** Both developers' Hermes sessions read the same `plan.md`. Sections 5–8 (Architecture, Tech Decisions, API Contract, Data Model) are binding — if a developer's work requires deviating from them, `plan.md` must be updated and re-approved by the human **before** implementation continues, so the two branches don't silently diverge.
 2. **Branch isolation.** Each developer works on their own branch (`feature/<name>-<task>`), never directly on `main`.
-3. **Run Merge-Readiness Loop:** Rebase/merge main, run full test suite, resolve textual conflicts, escalate semantic conflicts to a human.
-4. **Log Merge:** Record resolutions in `docs/MERGE_<date>_<branches>.md`.
+3. **Before merging a branch, run a Merge-Readiness Loop:**
+   - Pull the latest `main` into the feature branch (merge or rebase).
+   - Re-run the **full test suite** against the merged result — not just the feature branch's own tests. A feature can pass alone and still break the combined codebase.
+   - **Classify any conflicts:**
+     - *Textual, non-overlapping logic* (e.g., two unrelated functions changed in the same file) → Hermes resolves automatically, re-runs tests to confirm, and logs the resolution.
+     - *Semantic conflicts* (both developers changed the same function, the same API contract, or overlapping logic) → Hermes does **not** auto-resolve. It presents both versions side by side, explains what each does, and asks a human to decide. Implementation does not continue until a decision is made.
+   - Only after tests pass on the merged result does the branch become mergeable.
+4. **Merge via Pull Request, not direct push to `main`** (see Step 7 for exact merge policy).
+5. After any merge, create a `docs/MERGE_<date>_<branches>.md` log: which branches were merged, what conflicts were found, how each was resolved, and the post-merge test results.
 
 ---
 
-## Step 6 — Industry-Grade Documentation Deliverables (MANDATORY)
+## Step 6 — Industry-Grade Production Documentation (MANDATORY)
 
-Every completed project MUST produce and commit the following three documentation tiers:
+Every project MUST produce and maintain the following documentation artifacts:
 
 1. **Root `README.md`:**
-   - Visual architecture ASCII/Mermaid diagram showing components, databases, queues, and ports.
-   - Component & Service Port Inventory table.
-   - Role-Based Access Control matrix.
-   - Quickstart Guide via Docker Compose (`docker compose up -d --build`).
-   - Local Development Guide (virtualenv setup, running microservices and frontend locally).
-   - Automated Test execution commands (`pytest`, typecheck, security scans, frontend build).
+   - System architecture diagram (ASCII or Mermaid) illustrating services, components, databases, and network flows.
+   - Component & Port Inventory table.
+   - User Roles & Access Control matrix.
+   - Quickstart Guide via container orchestration (`docker compose up -d --build` or equivalent).
+   - Local Development Setup Guide (environment variables, dependency installation, running services locally).
+   - Test execution commands and test suite coverage summary.
    - Links to all phase documentation files.
 
-2. **`docs/APPLICATION_DOCUMENTATION.md` (Production Technical Specification):**
-   - Comprehensive API Reference for every microservice/endpoint with request/response examples and auth rules.
-   - Microservice boundaries, database isolation, and inter-service communication protocols.
-   - Domain Data Models, constraints, and entity relationships.
-   - State transition machine diagrams and lifecycle transition rules.
-   - Background tasks, scheduler intervals, and event-driven workflows (e.g. SLA engine).
-   - Error handling, status code conventions, and graceful degradation behaviors.
+2. **`docs/APPLICATION_DOCUMENTATION.md` (Comprehensive Technical & Operational Spec):**
+   - Detailed architectural boundary rules, data isolation, and inter-service protocols.
+   - Complete API endpoint reference with request/response schemas, status codes, and authentication requirements.
+   - Domain Data Models, field specifications, indices, constraints, and relational mappings.
+   - State transition diagrams and lifecycle rules.
+   - Background tasks, queues, scheduler intervals, and event-driven workflows.
+   - Error handling policies, failure modes, and graceful degradation strategies.
 
 3. **`docs/PHASE_<number>_<short-name>.md`:**
-   - Implementation summary for each completed phase.
+   - Summary of features and components implemented in each phase.
    - Loop Engineering log (diagnoses, fixes, iterations).
-   - Test results matrix referencing specific Test Case IDs (`TC-xxx`).
+   - Test results broken out by type (unit, integration, API, security, performance, edge case), referencing Test Case IDs (`TC-xxx`).
 
 ---
 
-## Step 7 — Git Automation & Remote Sync
+## Step 7 — Version Control & GitHub Automation
 
-- Keep local repository cleanly committed referencing phase numbers (e.g. `feat(phase-2): user auth`).
-- Push all branches and documentation to the remote repository on GitHub:
-  ```bash
-  git push -u origin main
-  ```
-- If working with feature branches, open Pull Requests against `main`. Never force-push or rewrite merged history.
+### 7.0 — GitHub Authentication: When and How
+
+- **When to give credentials:** right after `plan.md` is approved in Step 3 and configured via Step 3.1 before Step 4 begins.
+- **How:** use a fine-grained, repo-scoped GitHub Personal Access Token (or a GitHub App installation) with `Contents` (read/write), `Pull requests` (read/write), and `Workflows` (if applicable) permissions.
+- **Never paste the token directly into chat.** Set it as an environment variable (e.g., `GITHUB_TOKEN`) in the shell/session Hermes runs in. Hermes must never print, log, or commit the token anywhere, and must treat it as a secret.
+- Before starting implementation, confirm authentication with a test call or push.
+
+### 7.1 — Automation Policy
+
+Default policy:
+- Hermes may push freely to `feature/*` branches and open Pull Requests automatically.
+- `main` is protected: merges require CI green and human approval (unless autonomous merge is explicitly configured).
+- Push all completed code, tests, and documentation to the remote repository on `main` / feature branch at the end of every phase.
+- Every commit message should reference the phase or feature it implements (e.g., `feat(phase-2): add user auth endpoints`).
 
 ---
 
-## Step 8 — Deployment & Verification
+## Step 8 — Deployment & Browser Verification
 
-- Deploy per `plan.md` Section 17 (Docker Compose / container orchestration).
-- Run post-implementation health checks and verification tests.
-- Give the human the **live URL** to verify directly.
+- Deploy per `plan.md` Section 17.
+- Run the Post-Implementation Verification checks from Section 25 (smoke tests, health checks, metrics/log verification, regression tests).
+- Give the human the **live URL** to verify directly, along with a short summary of what was deployed.
 
-### 8.1 — Frontend Browser Verification (Playwright / E2E)
+### 8.1 — Frontend Browser E2E Verification (Playwright) — Mandatory when UI is present
 
-- When the application includes a frontend, Hermes MUST execute automated end-to-end browser verification against the running frontend using Playwright or `@playwright/test` / Vitest Browser mode.
-- E2E browser checks must verify:
-  1. Login & Registration flow and token persistence.
-  2. Route protection (unauthenticated redirects).
-  3. Core functional flow (e.g. raising a ticket, viewing list, posting comments, switching status).
-  4. Role-gated views (Admin controls and Reports charts visible only to authorized roles).
-- Confirm that no unhandled client-side JavaScript errors or broken network requests occur during the session.
+- When the project includes a user interface, Hermes MUST execute automated end-to-end browser verification against the running frontend using Playwright (or `@playwright/test` / Vitest Browser Mode).
+- Automated browser journeys must verify:
+  1. Authentication & registration flows and session persistence.
+  2. Route protection and unauthenticated redirect behaviors.
+  3. Primary user journeys and form submission flows end-to-end.
+  4. Role-gated controls and permission views across roles.
+  5. Absence of unhandled browser console errors or broken network requests.
+- Report observed browser test results in the phase documentation.
 
 ---
 
 ## Step 9 — Adding a New Feature Later
 
-When adding features after initial delivery:
-1. Update `plan.md` (FRs, TCs, architecture diffs) and `task.md`.
-2. Present diff to human for approval.
-3. Implement via Loop Engineering.
-4. Run full regression suite + Playwright E2E browser tests.
-5. Update `APPLICATION_DOCUMENTATION.md` and `README.md`.
-6. Push to remote repository and present live verification URL.
+When the human wants to add a feature after the initial build:
+1. **Update `plan.md`, not a separate file** — add new Functional Requirements, Test Cases, Edge Cases, and update Architecture/Data Model/API Contract if touched. Add a new phase under Section 23.
+2. **Re-run the Human Review Gate (Step 3)** for just the new/changed sections.
+3. **Implement the new phase** using the Loop Engineering cycle (Step 4).
+4. **Run full regression** — both backend test suite and Playwright browser E2E tests.
+5. **Update documentation** (`APPLICATION_DOCUMENTATION.md`, `README.md`, and create `docs/PHASE_*.md`).
+6. **Branch, PR, merge** following Step 7.
+7. **Deploy and re-verify** (Step 8) — give human updated URL.
+
+---
+
+## Step 10 — Microservices Adaptation
+
+Use this when the application is split into multiple services, each owned by a different developer/workspace.
+
+**Folder structure:**
+```
+project-root/
+  SYSTEM-PLAN.md          ← shared: architecture, service boundaries, inter-service contracts
+  service-<name-a>/
+    prd.md
+    plan.md                ← this service's own full plan.md (Appendix A template)
+    docs/
+  service-<name-b>/
+    prd.md
+    plan.md
+    docs/
+```
+
+### 10.1 Create `SYSTEM-PLAN.md` First (before any service-level work)
+Generate `SYSTEM-PLAN.md` using Appendix D. Goes through Step 3 Human Review Gate before any service's `plan.md` is written.
+
+### 10.2 Service `plan.md` Bound to `SYSTEM-PLAN.md`
+Each service gets its own `plan.md` matching `SYSTEM-PLAN.md` interfaces.
+
+### 10.3 Contract Testing
+Add Consumer-Driven Contract Tests to Section 14/15.
 
 ---
 
 # APPENDIX A — plan.md Template
 
-*(Standard specification template per HERMES-MANUAL.md)*
+*(See standard specification template)*
 
 ---
 
 # APPENDIX B — Loop Engineering (Reference)
 
-**Propose → Validate → Diagnose → Refine → Converge** (Max 5 attempts before reporting blocker).
+**Definition:** every build/test/fix cycle follows **propose → validate → diagnose → refine → converge**, never a single one-shot attempt (max 5 iterations before reporting blocker).
 
 ---
 
 # APPENDIX C — Quick Checklist
 
 - [ ] `prd.md` provided
-- [ ] `plan.md` and `SYSTEM-PLAN.md` (if microservices) generated
-- [ ] `plan.md` Section 5 includes concrete Directory Structure
-- [ ] `plan.md` Section 8 contains NO JSON/JSONB columns (strictly typed)
-- [ ] `task.md` generated with granular checkboxes mapped to FRs and TCs
-- [ ] **Human review gate (Step 3) explicitly approved**
-- [ ] **GitHub repository initialized with Description, Topics, and remote tracking (Step 3.1)**
-- [ ] Each phase implemented via Loop Engineering and tasks checked off in `task.md`
-- [ ] Static security scan executed (e.g. Bandit / npm audit)
-- [ ] **Automated Playwright / E2E browser test executed for frontend flows (Step 8.1)**
-- [ ] **Industry-grade root `README.md` created with architecture and run commands (Step 6)**
-- [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full API and technical spec (Step 6)**
-- [ ] Phase documentation (`docs/PHASE_*.md`) written for each phase
-- [ ] **All code and docs committed and pushed to remote GitHub repository (Step 7)**
-- [ ] Live deployment verified with working URL handed to human
+- [ ] `plan.md` generated per Appendix A, every FR mapped to a test case
+- [ ] `plan.md` Section 5 includes a concrete Project Directory Structure (not just prose)
+- [ ] `plan.md` Section 8 has no JSON/JSONB fields unless `prd.md` explicitly required them
+- [ ] `task.md` generated per Appendix E, derived from `plan.md` Section 23
+- [ ] **Human explicitly approved both `plan.md` and `task.md` before any code was written (Step 3)**
+- [ ] **GitHub repository initialized with Description, Topics, and remote tracking configured (Step 3.1)**
+- [ ] Each phase implemented via Loop Engineering cycle, tests passing before moving on, tasks checked off in `task.md`
+- [ ] **Industry-grade root `README.md` created with architecture diagrams and run commands (Step 6)**
+- [ ] **`docs/APPLICATION_DOCUMENTATION.md` created with full technical and API specs (Step 6)**
+- [ ] Phase doc created after each phase in `docs/PHASE_*.md`
+- [ ] Multi-developer branches merged only after full-suite re-validation
+- [ ] `main` protected — PR + green CI required
+- [ ] **Automated Playwright browser E2E verification executed if project has a UI (Step 8.1)**
+- [ ] **All code and documentation committed and pushed to remote GitHub repository (Step 7)**
+- [ ] Deployment verified and URL handed to the human
+
+---
+
+# APPENDIX D — SYSTEM-PLAN.md Template (Microservices)
+
+*(Standard microservices system plan template)*
+
+---
+
+# APPENDIX E — task.md Template
+
+*(Standard task tracking checklist template)*
