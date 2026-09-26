@@ -4,13 +4,13 @@
 
 ## 1. System Architecture & Boundaries
 
-The Support Ticket Raiser system is built as two strictly decoupled microservices communicating over HTTP REST, backed by separate databases, an asynchronous Celery task queue, and a React SPA.
+The Support Ticket Raiser system is built as three strictly decoupled microservices communicating over HTTP REST, backed by separate databases, an asynchronous Celery task queue, and a React SPA.
 
 ### Microservice Isolation Rules
-- **No Shared Database:** `user_service` connects exclusively to `user_db` (`5432`), and `assign_service` connects to `assign_db` (`5433`).
+- **No Shared Database:** `user_service` connects exclusively to `user_db` (`5434`), `assign_service` connects to `assign_db` (`5433`), and `doc_service` connects to `doc_db` (`5435`).
 - **No Foreign Keys Cross-Service:** References across domains (`created_by`, `assigned_to`, `author_id`, `notification.user_id`) are stored as standard integer IDs.
 - **Service Authentication:** Inter-service requests to `/internal/*` routes are authenticated via the `X-Internal-API-Key` HTTP header.
-- **Fast-Path Authentication:** `assign_service` decodes and verifies JWT tokens locally using the shared secret. If local verification fails, it queries `POST /internal/verify-token` on `user_service`.
+- **Fast-Path Authentication:** `assign_service` and `doc_service` decode and verify JWT tokens locally using the shared secret. If local verification fails, they query `POST /internal/verify-token` on `user_service`.
 - **Fault Tolerance:** If `user_service` is down:
   - Operations requiring live user verification (e.g. assigning a ticket to an agent) return `503 Service Unavailable`.
   - Read-only operations and comments continue operating uninterrupted.
@@ -161,3 +161,31 @@ The `doc_service` manages support documents, knowledge base articles, multi-crit
 - **Published:** Searchable and viewable by all customers and visitors.
 - **Archived:** Hidden from public searches; retained for internal reference and audits.
 
+---
+
+## 6. Frontend Knowledge Base Architecture (`frontend/`)
+
+The Knowledge Base UI is integrated into the core React SPA:
+
+### Page & Component Hierarchy
+```
+App.tsx
+├── Navbar.tsx (Knowledge Base link)
+├── /docs -> DocsExplorerPage.tsx
+│   ├── SearchBar (Debounced 300ms)
+│   ├── StaffActionBar (Role-gated New Article / Category Management)
+│   ├── FeaturedCarousel (Pinned guides highlight)
+│   ├── CategoryList.tsx (Category filtering & badge counts)
+│   ├── TagCloud.tsx (Pill tags multi-filter)
+│   ├── DocCard.tsx (Card grid with view metrics & ratings)
+│   ├── DocEditorModal.tsx (Authoring & editing with Live Preview)
+│   └── CategoryAdminModal.tsx (Category creation & governance)
+├── /docs/:idOrSlug -> DocReaderPage.tsx
+│   ├── BreadcrumbNavigation
+│   ├── EditorialToolbar (Edit, Status Transition, Delete, Share)
+│   ├── MarkdownRenderer.tsx (Secure typography & code styling)
+│   ├── FeedbackWidget.tsx (Helpfulness rating & improvement feedback)
+│   └── RelatedDocsSidebar (Category & tag recommendations)
+└── /tickets/new & /tickets/:id
+    └── SuggestedDocsWidget.tsx (Deflection & automated resolution assistance)
+```

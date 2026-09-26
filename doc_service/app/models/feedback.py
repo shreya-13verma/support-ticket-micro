@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from app.database import Base
 
 
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class DocumentFeedback(Base):
     __tablename__ = "document_feedback"
 
@@ -13,6 +17,6 @@ class DocumentFeedback(Base):
     user_ip_hash = Column(String(64), nullable=True, index=True)
     is_helpful = Column(Boolean, nullable=False)
     comment = Column(String(1000), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     document = relationship("Document", back_populates="feedbacks")

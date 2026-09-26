@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { assignClient } from '../api/client';
 import { NotificationItem } from '../types';
-import { Bell, Ticket, BarChart3, Shield, LogOut } from 'lucide-react';
+import { Bell, Ticket, BarChart3, Shield, LogOut, BookOpen } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -35,23 +35,25 @@ export const Navbar: React.FC = () => {
           <Ticket className="w-6 h-6" />
           <span>Support Desk</span>
         </Link>
-        {user && (
-          <div className="hidden md:flex space-x-6 text-sm font-medium text-slate-600">
-            <Link to="/" className="hover:text-indigo-600">Tickets</Link>
-            {(user.role === 'admin' || user.role === 'agent') && (
-              <Link to="/reports" className="flex items-center space-x-1 hover:text-indigo-600">
-                <BarChart3 className="w-4 h-4" />
-                <span>Reports</span>
-              </Link>
-            )}
-            {user.role === 'admin' && (
-              <Link to="/admin" className="flex items-center space-x-1 hover:text-indigo-600">
-                <Shield className="w-4 h-4" />
-                <span>Admin</span>
-              </Link>
-            )}
-          </div>
-        )}
+        <div className="flex items-center space-x-6 text-sm font-medium text-slate-600">
+          {user && <Link to="/" className="hover:text-indigo-600">Tickets</Link>}
+          <Link to="/docs" className="flex items-center space-x-1 hover:text-indigo-600">
+            <BookOpen className="w-4 h-4" />
+            <span>Knowledge Base</span>
+          </Link>
+          {user && (user.role === 'admin' || user.role === 'agent') && (
+            <Link to="/reports" className="flex items-center space-x-1 hover:text-indigo-600">
+              <BarChart3 className="w-4 h-4" />
+              <span>Reports</span>
+            </Link>
+          )}
+          {user && user.role === 'admin' && (
+            <Link to="/admin" className="flex items-center space-x-1 hover:text-indigo-600">
+              <Shield className="w-4 h-4" />
+              <span>Admin</span>
+            </Link>
+          )}
+        </div>
       </div>
 
       {user ? (

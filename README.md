@@ -27,6 +27,7 @@ A production-grade support ticket raising and tracking system built with a decou
 3. **Resilience & Graceful Degradation:** Local-first JWT validation (fast path) with remote verification fallback, and inter-service endpoints protected with `X-Internal-API-Key`.
 4. **Normalized Schemas:** Zero JSON/JSONB blob columns; strictly typed relational entities.
 5. **Background SLA Engine:** Celery + Redis automated periodic tasks scan active tickets every minute for SLA breach detection and trigger instant in-app alerts.
+6. **Self-Service Knowledge Base:** Dedicated Knowledge Base Explorer, Reader View with markdown typography & feedback ratings, and automatic ticket resolution suggestions (`SuggestedDocsWidget`).
 
 ---
 
@@ -76,6 +77,7 @@ docker compose logs -f
 
 Access points:
 - **Frontend Web UI:** `http://localhost:3000`
+- **Knowledge Base Explorer:** `http://localhost:3000/docs`
 - **User Service Docs (Swagger):** `http://localhost:8001/docs`
 - **Assign Service Docs (Swagger):** `http://localhost:8002/docs`
 - **Doc Service Docs (Swagger):** `http://localhost:8003/docs`
@@ -115,8 +117,7 @@ npm run dev
 
 ## Running Test Suites
 
-All microservices include automated unit, integration, and security test suites using `pytest`:
-
+### Backend Unit & Integration Tests
 ```bash
 # Run user_service tests
 PYTHONPATH=user_service pytest user_service/tests -v
@@ -128,9 +129,21 @@ PYTHONPATH=assign_service pytest assign_service/tests -v
 cd doc_service && pytest --cov=app tests/ -v
 ```
 
+### Frontend Unit & E2E Browser Tests
+```bash
+cd frontend
+
+# Run Vitest component & unit tests
+npm test
+
+# Run Playwright automated E2E browser tests
+node tests_e2e_browser.js
+```
+
 ---
 
 ## Documentation & Phase Reports
 Detailed phase implementation logs, test matrices, and verification outputs are located in the `docs/` directory:
-- `docs/PHASE_1_DOC_SERVICE_BACKEND.md` (Support Documents & Knowledge Base Microservice)
+- `docs/PHASE_1_DOC_SERVICE_BACKEND.md` (Support Documents & Knowledge Base Backend Microservice)
+- `docs/PHASE_2_DOC_SERVICE_FRONTEND.md` (Support Documents & Knowledge Base Frontend UI)
 - `docs/APPLICATION_DOCUMENTATION.md`

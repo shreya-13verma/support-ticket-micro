@@ -79,3 +79,6 @@ export interface AgentMetric {
   resolved_count: number;
   avg_resolution_hours: number;
 }
+
+export * from './docs';
+
