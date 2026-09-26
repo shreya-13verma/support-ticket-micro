@@ -108,3 +108,56 @@ The Support Ticket Raiser system is built as two strictly decoupled microservice
 3. Overdue tickets with `sla_breached == False` are flagged atomically.
 4. Notifications are generated for the ticket creator and assigned agent.
 5. An audit log entry (`SLA_BREACH`) is appended to the ticket history.
+
+---
+
+## 5. Support Document Service (`doc_service`, `http://localhost:8003`)
+
+The `doc_service` manages support documents, knowledge base articles, multi-criteria search, categorization, tags, and user helpfulness feedback ratings.
+
+### Public & Role-Gated Endpoints
+
+| Method | Endpoint | Description | Roles / Access | Status Codes |
+|---|---|---|---|---|
+| `GET` | `/health` | Service and database health check | Public | 200, 503 |
+| `GET` | `/api/v1/categories` | List active categories (Admins see all) | Public / Role-aware | 200 |
+| `GET` | `/api/v1/categories/{id}` | Get category by ID | Public | 200, 404 |
+| `POST` | `/api/v1/categories` | Create category | Admin only | 201, 400, 403 |
+| `PUT` | `/api/v1/categories/{id}` | Update category metadata/slug | Admin only | 200, 400, 403, 404 |
+| `DELETE` | `/api/v1/categories/{id}` | Delete category (rejected if docs attached) | Admin only | 204, 403, 404, 409 |
+| `GET` | `/api/v1/tags` | List all tags | Public | 200 |
+| `POST` | `/api/v1/tags` | Create tag | Agent / Admin | 201, 400, 403 |
+| `GET` | `/api/v1/docs` | List & search articles (Public sees published; Agent/Admin sees drafts) | Public / Role-aware | 200 |
+| `GET` | `/api/v1/docs/{id_or_slug}` | Get single article by ID or slug (increments view count if published) | Public / Role-aware | 200, 404 |
+| `POST` | `/api/v1/docs` | Create article (Agents default to `draft`; Admins can create `published`) | Agent / Admin | 201, 400, 403 |
+| `PUT` | `/api/v1/docs/{id}` | Update article details | Author (drafts) / Admin | 200, 400, 403, 404 |
+| `PATCH` | `/api/v1/docs/{id}/status` | Change status (`draft`, `published`, `archived`) | Admin only | 200, 400, 403, 404 |
+| `DELETE` | `/api/v1/docs/{id}` | Delete article | Admin only | 204, 403, 404 |
+| `POST` | `/api/v1/docs/{id}/view` | Explicitly increment view counter | Public | 200, 404 |
+| `POST` | `/api/v1/docs/{id}/feedback` | Submit helpfulness rating (`is_helpful`, comment) | Public / User | 201, 400, 404 |
+| `GET` | `/api/v1/docs/{id}/feedback/stats` | Retrieve feedback statistics & helpful ratio | Agent / Admin | 200, 403, 404 |
+
+### Internal Inter-Service Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/internal/docs/suggest` | Query relevant articles by text query & category for agent ticket assistance | `X-Internal-API-Key` |
+| `GET` | `/internal/docs/{id}` | Retrieve internal article metadata by ID | `X-Internal-API-Key` |
+
+### Document Publication State Machine
+
+```
+   ┌───────────┐
+   │   DRAFT   ├──────────────────┐
+   └─────┬─────┘                  │
+         │ (Admin Publish)        │
+         ▼                        ▼
+   ┌───────────┐           ┌─────────────┐
+   │ PUBLISHED ├──────────►│  ARCHIVED   │
+   └───────────┘           └─────────────┘
+```
+
+- **Draft:** Visible only to the authoring Agent and Admins.
+- **Published:** Searchable and viewable by all customers and visitors.
+- **Archived:** Hidden from public searches; retained for internal reference and audits.
+
