@@ -10,6 +10,8 @@ import { CreateTicketPage } from './pages/CreateTicketPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { AdminPage } from './pages/AdminPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { DocsExplorerPage } from './pages/DocsExplorerPage';
+import { DocReaderPage } from './pages/DocReaderPage';
 
 export const App: React.FC = () => {
   return (
@@ -61,6 +63,11 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Knowledge Base & Support Documentation Routes */}
+              <Route path="/docs" element={<DocsExplorerPage />} />
+              <Route path="/docs/:idOrSlug" element={<DocReaderPage />} />
+
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

@@ -4,6 +4,7 @@ import { assignClient, userClient } from '../api/client';
 import { Ticket, Comment, Attachment, User, TicketStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge, PriorityBadge } from '../components/Badges';
+import { SuggestedDocsWidget } from '../components/docs/SuggestedDocsWidget';
 import { ArrowLeft, Send, Paperclip, UserCheck, ShieldAlert, FileText, Download } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
@@ -251,6 +252,11 @@ export const TicketDetailPage: React.FC = () => {
 
         {/* Sidebar Controls */}
         <div className="space-y-6">
+          {/* Knowledge Base Recommendations */}
+          {ticket && (
+            <SuggestedDocsWidget query={ticket.title} />
+          )}
+
           {/* Status & Assignment Box (Agent/Admin) */}
           {(user?.role === 'agent' || user?.role === 'admin') && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">

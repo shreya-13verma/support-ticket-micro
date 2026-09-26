@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { assignClient } from '../api/client';
+import { SuggestedDocsWidget } from '../components/docs/SuggestedDocsWidget';
 import { ArrowLeft } from 'lucide-react';
 
 export const CreateTicketPage: React.FC = () => {
@@ -60,6 +61,11 @@ export const CreateTicketPage: React.FC = () => {
               placeholder="e.g. Cannot connect to staging database"
             />
           </div>
+
+          {/* Suggested Knowledge Base docs */}
+          {title.trim().length >= 3 && (
+            <SuggestedDocsWidget query={title} />
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

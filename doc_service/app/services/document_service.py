@@ -269,14 +269,19 @@ class DocumentService:
 
         # Text search across title, summary, content
         if search and search.strip():
-            term = f"%{search.strip()}%"
-            search_clause = or_(
-                Document.title.ilike(term),
-                Document.summary.ilike(term),
-                Document.content.ilike(term)
-            )
-            query = query.where(search_clause)
-            count_query = count_query.where(search_clause)
+            words = [w.strip() for w in search.strip().split() if len(w.strip()) > 1]
+            if words:
+                clauses = [
+                    or_(
+                        Document.title.ilike(f"%{w}%"),
+                        Document.summary.ilike(f"%{w}%"),
+                        Document.content.ilike(f"%{w}%")
+                    )
+                    for w in words
+                ]
+                search_clause = or_(*clauses)
+                query = query.where(search_clause)
+                count_query = count_query.where(search_clause)
 
         # Total count
         total_res = await db.execute(count_query)
@@ -322,14 +327,17 @@ class DocumentService:
             query = query.where(Document.category_id == category_id)
 
         if query_text and query_text.strip():
-            term = f"%{query_text.strip()}%"
-            query = query.where(
-                or_(
-                    Document.title.ilike(term),
-                    Document.summary.ilike(term),
-                    Document.content.ilike(term)
-                )
-            )
+            words = [w.strip() for w in query_text.strip().split() if len(w.strip()) > 1]
+            if words:
+                clauses = [
+                    or_(
+                        Document.title.ilike(f"%{w}%"),
+                        Document.summary.ilike(f"%{w}%"),
+                        Document.content.ilike(f"%{w}%")
+                    )
+                    for w in words
+                ]
+                query = query.where(or_(*clauses))
 
         query = query.order_by(Document.helpful_count.desc(), Document.view_count.desc()).limit(limit)
         res = await db.execute(query)

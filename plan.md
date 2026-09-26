@@ -1,482 +1,440 @@
-# PLAN.md — Support Documents & Knowledge Base Service (Backend)
+# PLAN.md — Support Documents & Knowledge Base Frontend (`support-doc-fe`)
 
 ## 1. Overview
-- **Project / Feature Name:** Support Documents & Knowledge Base Backend Service (`doc_service`)
-- **Problem Statement:** The existing Support Desk system manages identity/users (`user_service`) and tickets/SLAs (`assign_service`), but lacks a dedicated, scalable knowledge base / support documentation service. Customers need self-service answers to resolve queries quickly, agents need standardized knowledge assets to assist during ticket resolution, and administrators need full authoring and publication lifecycle controls.
-- **Goal:** Deliver a high-performance, fully decoupled FastAPI microservice (`doc_service`) providing REST APIs for creating, editing, categorizing, tagging, searching, rating, and managing support documents and knowledge base articles with strict RBAC, comprehensive test coverage (>85%), and seamless integration with existing microservices.
+- **Project / Feature Name:** Support Documents & Knowledge Base Frontend UI (`support-doc-fe`)
+- **Problem Statement:** The existing Support Desk frontend allows users to raise and track tickets, agents to triage and reply, and admins to manage users and view SLA reports. However, it lacks a dedicated self-service Knowledge Base / Support Documentation interface. Customers cannot search or read troubleshooting guides, and agents/admins have no UI to create, edit, categorize, or publish knowledge articles directly against the `doc_service` REST API (port 8003).
+- **Goal:** Build an intuitive, responsive, and robust React + TypeScript + Tailwind CSS Knowledge Base frontend module integrated into the Support Desk application. It features a rich **Explorer View**, a clean **Reader View** with helpfulness rating feedback and markdown rendering, an **Editor Modal / Page** for drafting and editing articles with live markdown preview, Category & Tag controls, and integration with ticket handling.
 - **Non-goals:**
-  - Frontend / UI components (frontend UI will be built separately by another developer using this API).
-  - Direct database coupling with `user_db` or `assign_db` (strict microservice boundary maintained).
-  - External multi-tenant document isolation beyond system RBAC roles.
+  - Modifying backend schemas or database tables in `doc_service` (the frontend connects directly to the existing `doc_service` REST API at `http://localhost:8003/api/v1`).
+  - Replacing existing ticket management views or user authentication flows.
 - **Success Criteria:**
-  - API p95 response latency < 200ms for read/search queries under 20 concurrent users.
-  - Test coverage > 85% across unit, integration, and API test suites.
-  - Complete lifecycle support for articles (Draft → Review → Published → Archived → Deleted) and document feedback/ratings.
-  - Zero cross-service database access or foreign keys; stateless JWT validation using shared secret and `X-Internal-API-Key` internal endpoints.
+  - Complete, seamless integration with `doc_service` backend API (`/api/v1/docs`, `/api/v1/categories`, `/api/v1/tags`, `/api/v1/docs/{id}/feedback`).
+  - 100% frontend test pass rate (Vitest component/unit tests + Playwright E2E browser tests).
+  - Clean RBAC handling: public/customer browsing and rating, Agent drafting and editing, Admin full publication and category governance.
+  - Zero unhandled console errors or broken UI states.
 
 ---
 
 ## 2. Requirements
 
 ### Functional Requirements
-- **FR-001 (Article CRUD & Lifecycle):** Create, read, update, delete, and list support documents with fields: title, slug (unique), content (markdown/text), summary/excerpt, category_id, status (`draft`, `published`, `archived`), is_featured (boolean), author_id, view_count, helpful_count, not_helpful_count, created_at, and updated_at.
-- **FR-002 (Category & Tag Management):** Hierarchical or flat document categorization (`categories`: id, name, slug, description, display_order) and normalized tag management (`tags`: id, name, slug; `document_tags` join table).
-- **FR-003 (Search & Filter Engine):** Fast search across article titles, content, excerpts, and tags with filters for `category_id`, `tag`, `status`, `author_id`, `is_featured`, and sorting by `created_at`, `views`, `helpfulness`, and `title`, with offset/limit pagination.
-- **FR-004 (Role-Based Access Control):**
-  - **User (Customer):** Can browse, search, view published articles, and submit helpfulness feedback. Cannot view draft/archived articles or modify content.
-  - **Agent:** Can view published and draft articles, author new articles (created in `draft` or `published` based on policy), edit draft articles they authored, and search internal knowledge assets.
-  - **Admin:** Full administrative permissions — create, update, delete, publish, archive any article, manage categories, and manage tags.
-- **FR-005 (Document Feedback & Rating Lifecycle):** Authenticated and guest/visitor feedback endpoint (`POST /api/v1/docs/{id}/feedback`) allowing users to record `is_helpful: bool` with optional comment, preventing duplicate vote spam via user_id / client tracking, and maintaining aggregate `helpful_count` and `not_helpful_count`.
-- **FR-006 (View Tracking & Analytics):** Increment view count (`POST /api/v1/docs/{id}/view` or automatic view registration on `GET /api/v1/docs/{slug}`) with de-duplication window.
-- **FR-007 (Internal Inter-Service API):** Secure internal API endpoints protected by `X-Internal-API-Key` allowing `assign_service` to query relevant support docs based on ticket keywords or category for agent assistance.
+- **FR-001 (Document Explorer View):**
+  - Search bar with debounced query input matching title, summary, and content.
+  - Category sidebar/filter tabs with document count badges.
+  - Tag filter cloud allowing single/multi-tag selection.
+  - Status filter dropdown (`all`, `published`, `draft`, `archived`) visible to Agent/Admin roles.
+  - Sorting options (Newest, Oldest, Most Viewed, Most Helpful, Title A-Z).
+  - Featured articles carousel / pinned cards highlight.
+  - Responsive document card grid showing title, summary, category badge, tags, author, date, views, and helpful score.
+  - Pagination controls (page selector, limit selector).
+  - "New Article" CTA button for Agent/Admin navigating to Editor.
+- **FR-002 (Document Reader View):**
+  - Clean markdown reader rendering headers, lists, code blocks, tables, blockquotes, links, and formatting.
+  - Breadcrumb navigation (`Home > Knowledge Base > Category > Article Title`).
+  - Article metadata bar: Category, tags, author ID/name, publication date, last updated date, and total views.
+  - Interactive Helpfulness Rating Widget ("Was this article helpful? [Yes] / [No]") with feedback comment submission and duplicate submission prevention.
+  - Administrative Action Toolbar for Admin/Agent: "Edit Article", "Status Toggle (Publish / Archive / Draft)", "Delete Article" with confirmation modal.
+  - Related Articles section recommending relevant guides based on category and tags.
+  - Share link button with clipboard copy notification.
+- **FR-003 (Document Editor Modal & View):**
+  - Form fields: Title, auto-generated editable Slug, Category dropdown, Tag selector (pick existing tags or create new tags on the fly), Summary/Excerpt, and Content markdown area.
+  - Split-pane / tabbed live markdown preview.
+  - Status selector (`draft`, `published`, `archived`) and `is_featured` boolean toggle.
+  - Form validation with inline error messages for required fields.
+  - Save as Draft vs. Publish immediate actions.
+  - Edit mode pre-populating existing article values and performing `PUT /api/v1/docs/{id}` updates.
+- **FR-004 (Category & Tag Management Modal):**
+  - Category manager for Admin to create, update, and delete categories with icon/color selection and display order.
+  - Tag manager / autocomplete input inside editor for easy tagging.
+- **FR-005 (Global Navigation & Ticket Cross-linking):**
+  - Add "Knowledge Base" / "Docs" link to main `Navbar.tsx`.
+  - Provide "Suggested Help Articles" drawer/card inside `CreateTicketPage.tsx` and `TicketDetailPage.tsx` querying `/internal/docs/suggest` or `/api/v1/docs?search=...` to resolve customer queries before ticket submission.
+- **FR-006 (Role-Based Access Control & Route Guards):**
+  - Unauthenticated visitors & Customers (`user` role) can browse, search, view published docs, and rate articles.
+  - Support Agents (`agent` role) can view drafts, author new articles, and edit their drafts.
+  - Administrators (`admin` role) have full create, edit, delete, category management, and publish/archive authority.
 
 ### User Stories & Complete Lifecycle Scenarios
-- **US-001 (End-User / Customer — Knowledge Discovery):**
-  - *As a customer,* I want to search and read published support documentation so that I can resolve my issues without raising a ticket.
-  - **Scenario A (Happy Path):** Given a published document on "Resetting 2FA", when the customer searches for "2FA reset", then the API returns the matching document with summary, tags, and category, and viewing the document increments its view count.
-  - **Scenario B (Unpublished Access Prevention):** Given a document in `draft` or `archived` status, when a customer attempts to access it by slug or ID, then the API returns `404 Not Found` (or `403 Forbidden`).
-  - **Scenario C (Feedback Submission):** Given a customer reads a published document, when they submit feedback (`is_helpful=true`), then `helpful_count` increases by 1 and the feedback is recorded.
+- **US-001 (Customer — Self-Service Discovery & Reading):**
+  - *As a customer,* I want to search knowledge base articles by keyword or category so that I can quickly troubleshoot problems without filing a support ticket.
+  - **Scenario A (Happy Path Search & Read):** Given a customer on `/docs`, when they type "password reset" into the search bar, the card grid filters to relevant published articles in real-time. When clicked, the Reader View renders the markdown guide and increments the view counter.
+  - **Scenario B (Helpfulness Feedback):** Given a customer reading an article, when they click "Yes, helpful", the feedback is submitted to `POST /api/v1/docs/{id}/feedback`, the helpful count increments, and a thank-you badge is shown.
+  - **Scenario C (Unpublished Article Guard):** Given a customer attempting to navigate to `/docs/draft-article-slug`, the reader displays a 404/Access Denied notice.
 
-- **US-002 (Support Agent — Article Authoring & Internal Search):**
-  - *As a support agent,* I want to draft troubleshooting guides and search existing internal docs so that customer solutions are standardized.
-  - **Scenario A (Drafting Article):** Given an authenticated Agent, when they create a document with title, content, category, and tags, then the document is saved with `status="draft"` and `author_id` set to the agent.
-  - **Scenario B (Agent Editing):** Given an Agent-authored draft, when the agent updates the content, then changes are persisted and updated_at is refreshed.
-  - **Scenario C (Internal Search):** Given an Agent searching documents, when filtering with `status=draft`, then draft articles authored by the agent or published guides are returned.
+- **US-002 (Agent — Article Authoring & Internal Knowledge Access):**
+  - *As a support agent,* I want to draft troubleshooting guides directly from the web interface so that our support team can standardize resolutions.
+  - **Scenario A (Draft Creation):** Given an Agent logged into Support Desk, when they click "New Article", the Editor modal opens. When they fill title, summary, markdown content, select "Billing" category, and click "Save as Draft", the document is saved and appears under the Agent's Drafts list.
+  - **Scenario B (Agent Editing):** Given an existing draft, when the Agent opens the Editor and edits content with live markdown preview, changes are saved via `PUT /api/v1/docs/{id}`.
 
-- **US-003 (Admin — Full Editorial & Category Governance):**
-  - *As a system admin,* I want to manage categories, tags, and publish/archive/delete articles so that the knowledge base remains accurate, organized, and up to date.
-  - **Scenario A (Publishing & Archiving Lifecycle):** Given a draft document, when an Admin updates `status="published"`, then it becomes immediately visible to public queries. When later updated to `archived`, it is hidden from customer queries.
-  - **Scenario B (Category Hierarchy & Deletion Safety):** Given an Admin creates categories, when an Admin attempts to delete a category that contains active documents, then the API rejects the deletion with `409 Conflict` until documents are re-assigned or force-deleted.
-  - **Scenario C (Tag Reorganization):** Given an Admin updates or cleans up unused tags, changes reflect across document associations without data corruption.
-
-- **US-004 (Inter-Service Consumer — Ticket Resolution Assistance):**
-  - *As the `assign_service` / Agent Workflow,* I want to query relevant support articles using ticket category and keywords via internal API so that agents can suggest articles directly in ticket replies.
-  - **Scenario A (Internal Suggestion Query):** Given a request from `assign_service` with `X-Internal-API-Key` and query "billing error", then `doc_service` returns top 5 relevant published articles.
-  - **Scenario B (Invalid Key):** Given a request lacking a valid `X-Internal-API-Key`, then `doc_service` rejects the call with `403 Forbidden`.
+- **US-003 (Admin — Editorial & Category Governance):**
+  - *As an administrator,* I want to manage categories, publish reviewed drafts, and archive outdated articles so that the knowledge base remains organized and high quality.
+  - **Scenario A (Publishing Draft):** Given a draft article, when Admin clicks "Publish", the status transitions to `published` and is immediately visible to public users.
+  - **Scenario B (Category Creation):** Given the Admin Category Modal, when Admin adds a new category "Network Troubleshooting", it immediately appears in the Explorer filter list.
+  - **Scenario C (Safe Article Deletion):** Given an obsolete document, when Admin clicks "Delete", a confirmation dialog warns the user; upon confirmation, the article is deleted from `doc_service` and removed from the Explorer list.
 
 ### Non-Functional Requirements
-- **Performance:** p95 read/search response time < 200ms; p95 write response time < 300ms under 20 concurrent connections.
-- **Scalability:** Stateless service container architecture; database indexes on `slug`, `category_id`, `status`, `is_featured`, and full-text index on `title` and `content`.
-- **Availability:** 99.5% uptime target with graceful degradation when optional dependencies fail.
-- **Reliability:** Idempotent slug generation; transactional database operations for document, tag, and feedback associations.
-- **Security:**
-  - Standardized JWT authentication validating tokens issued by `user_service` via shared `SECRET_KEY` and `ALGORITHM=HS256`.
-  - Strict RBAC enforcing permissions based on JWT `role` (`User`, `Agent`, `Admin`).
-  - Internal endpoints strictly protected by `X-Internal-API-Key`.
-  - Input validation and sanitization against XSS in document markdown/content.
-- **Observability:** Structured JSON logs, unique `X-Request-ID` tracing, `/health` and `/ready` endpoints verifying database connectivity.
-- **Maintainability:** Clean layered architecture (`app/models`, `app/schemas`, `app/routes`, `app/services`, `app/utils`, `tests/`) consistent with `user_service` and `assign_service`.
+- **Performance:** Initial Explorer page load < 300ms; search debounce 300ms; markdown rendering < 50ms for large documents.
+- **Responsiveness:** Full responsive layout supporting mobile (375px), tablet (768px), and desktop (1280px+).
+- **Accessibility & UX:** Keyboard navigable forms, high-contrast readable markdown typography, clear loading skeletons, toast notifications for async actions, and graceful empty states.
+- **Security:** Strict JWT token attachment via Axios interceptor, XSS sanitization in markdown HTML rendering, and client-side route guards matching backend permissions.
 
 ---
 
 ## 3. Scope
 
 ### In Scope
-- Creation of the standalone `doc_service` microservice folder and architecture.
-- REST API endpoints for:
-  - Documents / Articles (CRUD, listing, filtering, search, slug lookup, status transition).
-  - Categories (CRUD, listing, ordering).
-  - Tags (Listing, search, creation).
-  - Document Feedback & Ratings (`helpful` / `not_helpful`).
-  - Internal Service-to-Service queries for document recommendations (`/internal/docs/suggest`, `/internal/docs/{id}`).
-- Database models, migrations, and seed scripts in `doc_service`.
-- Local JWT verification utilities and role permission dependencies.
-- Dockerfile and `docker-compose.yml` update adding `doc_service` and `doc_db` (port 8003 & 5435).
-- Comprehensive Pytest test suite (Unit, Service, Integration, API, RBAC security, and Edge Cases).
+- Frontend React components and pages in `frontend/src/`:
+  - `pages/DocsExplorerPage.tsx`
+  - `pages/DocReaderPage.tsx`
+  - `components/docs/DocEditorModal.tsx`
+  - `components/docs/DocCard.tsx`
+  - `components/docs/CategoryList.tsx`
+  - `components/docs/TagCloud.tsx`
+  - `components/docs/FeedbackWidget.tsx`
+  - `components/docs/CategoryAdminModal.tsx`
+  - `components/docs/MarkdownRenderer.tsx`
+  - `components/docs/SuggestedDocsWidget.tsx`
+- API client extensions in `frontend/src/api/client.ts` (`docsClient`, `DOCS_API_BASE`).
+- TypeScript interfaces in `frontend/src/types/docs.ts` and `frontend/src/types/index.ts`.
+- Routing configuration in `frontend/src/App.tsx` (`/docs`, `/docs/:idOrSlug`).
+- Integration into `Navbar.tsx`, `CreateTicketPage.tsx`, and `TicketDetailPage.tsx`.
+- Comprehensive Vitest unit/component tests and Playwright E2E browser tests.
 
 ### Out of Scope
-- Frontend UI / React components (frontend is strictly developed separately by another developer).
-- File/Attachment binary hosting within `doc_service` (documents reference URLs or markdown media).
-- Cloud Elasticsearch/OpenSearch clusters (native PostgreSQL full-text search & Trigram indexing used for target scale).
+- Direct modifications to backend database models (backend `doc_service` is ready on port 8003).
+- Real-time collaborative document editing (WebSockets for docs).
 
 ---
 
 ## 4. User / System Flows
 
 ```
-[ Customer / Agent / Admin / assign_service ]
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │ FastAPI (doc_service) │
-         └───────────┬───────────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
- [ Public/User Routes ]   [ Internal Routes ]
-   - Auth: JWT (Bearer)     - Auth: X-Internal-API-Key
-   - RBAC Verification      - Service-to-service
-   - CRUD & Search          - Contextual suggestions
-         │                       │
-         └───────────┬───────────┘
-                     ▼
-             [ doc_service DB ]
-             - documents
-             - categories
-             - tags & doc_tags
-             - document_feedback
+                   ┌──────────────────────────────────────────────┐
+                   │               User / Browser                 │
+                   └──────────────────────┬───────────────────────┘
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  ▼                                               ▼
+         [ Browse & Search ]                             [ Author / Edit ]
+        /docs (Explorer Page)                        /docs (Editor Modal / Page)
+                  │                                               │
+      ┌───────────┴───────────┐                       ┌───────────┴───────────┐
+      ▼                       ▼                       ▼                       ▼
+Filter Categories       Search Keyword          Live MD Preview          Save / Publish
+      │                       │                       │                       │
+      └───────────┬───────────┘                       └───────────┬───────────┘
+                  │                                               │
+                  ▼                                               ▼
+        [ Click Document Card ]                         [ doc_service REST API ]
+                  │                                     http://localhost:8003/api/v1
+                  ▼                                               ▲
+         /docs/:idOrSlug                                          │
+       (Doc Reader Page) ─────────────────────────────────────────┘
+         - Markdown Render
+         - Feedback Rating
+         - Admin Actions (Edit/Publish/Delete)
 ```
-
-- **Article Read Flow:** Client requests `GET /api/v1/docs/{slug}` → `doc_service` validates JWT if present → if visitor/User, verifies `status == 'published'` → increments view count → returns document payload with category and tags.
-- **Article Creation Flow:** Agent/Admin requests `POST /api/v1/docs` with payload → validates schema & slug uniqueness → associates category & tags in transaction → saves document → returns created document entity (`201 Created`).
-- **Feedback Submission Flow:** User requests `POST /api/v1/docs/{id}/feedback` with `is_helpful` → checks document exists and is published → records feedback record and updates aggregate counts atomically → returns updated feedback stats (`200 OK`).
 
 ---
 
-## 5. Architecture
+## 5. Directory Structure & Frontend Plan
 
-### Components & Services
-- **`doc_service` (FastAPI / Python 3.12+):** Independent REST service running on port 8003.
-- **`doc_db` (PostgreSQL 16):** Dedicated relational database running on port 5435 (container 5432).
-- **Authentication Gateway:** Local JWT verification using shared `SECRET_KEY` + `ALGORITHM=HS256`, decoding `user_id`, `email`, and `role`.
-- **Internal Integration:** Internal router listening on `/internal/docs/*` with `X-Internal-API-Key` authorization.
-
-### Project Directory Structure
+### Explicit File Tree
 ```
-/home/shreya/support-ticket-support-doc/
-├── doc_service/                             (new microservice)
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── alembic.ini
-│   ├── alembic/
-│   │   ├── env.py
-│   │   ├── script.py.mako
-│   │   └── versions/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── database.py
-│   │   ├── models/
-│   │   │   ├── __init__.py
-│   │   │   ├── category.py
-│   │   │   ├── tag.py
-│   │   │   ├── document.py
-│   │   │   └── feedback.py
-│   │   ├── schemas/
-│   │   │   ├── __init__.py
-│   │   │   ├── category.py
-│   │   │   ├── tag.py
-│   │   │   ├── document.py
-│   │   │   └── feedback.py
-│   │   ├── routes/
-│   │   │   ├── __init__.py
-│   │   │   ├── categories.py
-│   │   │   ├── tags.py
-│   │   │   ├── documents.py
-│   │   │   ├── feedback.py
-│   │   │   └── internal.py
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── document_service.py
-│   │   │   ├── category_service.py
-│   │   │   └── feedback_service.py
-│   │   └── utils/
-│   │       ├── __init__.py
-│   │       ├── security.py
-│   │       ├── slug.py
-│   │       └── logging.py
+frontend/
+├── src/
+│   ├── api/
+│   │   ├── client.ts                 # Added docsClient (port 8003)
+│   │   └── docsApi.ts                # Dedicated API service layer for docs/categories/tags
+│   ├── components/
+│   │   ├── Navbar.tsx                # Added Knowledge Base navigation link
+│   │   └── docs/
+│   │       ├── DocCard.tsx           # Document card for Explorer grid
+│   │       ├── DocEditorModal.tsx    # Document creation / edit modal with markdown preview
+│   │       ├── CategoryList.tsx      # Category navigation list & filter
+│   │       ├── TagCloud.tsx          # Tag pills and selector
+│   │       ├── FeedbackWidget.tsx    # Thumbs up/down helpfulness widget
+│   │       ├── CategoryAdminModal.tsx# Category management dialog for Admin
+│   │       ├── MarkdownRenderer.tsx  # Secure markdown parser & styler
+│   │       └── SuggestedDocsWidget.tsx# Suggested docs drawer for ticket creation/view
+│   ├── pages/
+│   │   ├── DocsExplorerPage.tsx      # Main Knowledge Base search & explorer view
+│   │   ├── DocReaderPage.tsx         # Document article reader view with metadata & feedback
+│   │   ├── CreateTicketPage.tsx      # Enhanced with suggested docs helper
+│   │   └── TicketDetailPage.tsx      # Enhanced with relevant docs drawer
+│   ├── types/
+│   │   ├── index.ts                  # Re-export docs types
+│   │   └── docs.ts                   # Document, Category, Tag, Feedback TypeScript interfaces
+│   ├── App.tsx                       # Routes: /docs, /docs/:idOrSlug
 │   └── tests/
-│       ├── __init__.py
-│       ├── conftest.py
-│       ├── test_categories.py
-│       ├── test_tags.py
-│       ├── test_documents.py
-│       ├── test_feedback.py
-│       ├── test_search.py
-│       ├── test_rbac.py
-│       └── test_internal.py
-├── docker-compose.yml                       (updated to add doc_service & doc_db)
-├── SYSTEM-PLAN.md                           (updated to register doc_service inventory)
-├── plan.md                                  (this document)
-├── task.md                                  (live progress checklist)
-└── docs/
-    └── PHASE_1_DOC_SERVICE_BACKEND.md
+│       ├── docs_explorer.test.tsx    # Vitest component test for Explorer
+│       ├── doc_reader.test.tsx       # Vitest component test for Reader & Feedback
+│       ├── doc_editor.test.tsx       # Vitest component test for Editor Modal
+│       └── e2e_docs.spec.ts          # Playwright E2E browser test
+├── package.json
+└── vite.config.ts
 ```
 
-### Frontend Plan
-- **N/A — Backend Only Feature:** Per `prd-support-docs.md`, the scope is strictly Backend REST API. The frontend UI will be built separately by another developer using these APIs.
+---
+
+## 6. Architecture & System Boundaries
+
+- **Client-Side SPA:** Single Page Application powered by Vite + React 18 + React Router v6.
+- **Service Integration:**
+  - `user_service` (port 8001): Authentication, user identity, JWT tokens.
+  - `assign_service` (port 8002): Tickets, comments, SLA policies.
+  - `doc_service` (port 8003): Support documents, categories, tags, and document feedback.
+- **Authentication Handshake:** JWT `access_token` stored in `localStorage` is injected into `Authorization: Bearer <token>` header on all requests via Axios interceptors in `client.ts`.
 
 ---
 
-## 6. Technology Decisions
-- **Language & Framework:** Python 3.12+ with FastAPI (Async, Pydantic v2, high performance).
-- **ORM & Database:** SQLAlchemy 2.0 (async with `asyncpg` for PostgreSQL production, `aiosqlite` for lightweight unit tests).
-- **Database Migrations:** Alembic for robust schema evolution.
-- **Authentication:** `python-jose` / `PyJWT` with `passlib[bcrypt]` compatibility matching `user_service`.
-- **Search Engine:** PostgreSQL native text search / ILIKE with indexed trigrams and vector weighting, ensuring zero external search cluster overhead for the 10–20 concurrent user footprint.
+## 7. Tech Stack & Dependencies
+
+- **Framework:** React 18, TypeScript 5.4, Vite 5.2
+- **Routing:** `react-router-dom` v6.23
+- **Styling:** Tailwind CSS 3.4, Lucide React icons
+- **HTTP Client:** Axios 1.7
+- **Markdown Rendering:** Lightweight custom / standard safe markdown parser with syntax highlighting
+- **Testing:** Vitest 1.6, Testing Library (`@testing-library/react`, `@testing-library/jest-dom`), Playwright browser test runner
 
 ---
 
-## 7. API / Interface Contract
+## 8. Data Model (Frontend TypeScript Models)
 
-### Authentication & Authorization Headers
-- Public User/Agent/Admin endpoints: `Authorization: Bearer <JWT_TOKEN>` (optional for public published document view, required for authoring/feedback/admin).
-- Internal service-to-service endpoints: `X-Internal-API-Key: <SECRET_KEY>`
+```typescript
+export type DocStatus = 'draft' | 'published' | 'archived';
 
-### Endpoints Overview
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  display_order: number;
+  is_active: boolean;
+  doc_count?: number;
+  created_at: string;
+}
 
-| Method | Endpoint | Description | Auth / Role | Status Codes |
-|---|---|---|---|---|
-| `GET` | `/health` | Health and DB connectivity check | Public | 200, 503 |
-| `GET` | `/api/v1/categories` | List all active categories | Public | 200 |
-| `POST` | `/api/v1/categories` | Create a category | Admin | 201, 400, 401, 403 |
-| `PUT` | `/api/v1/categories/{id}` | Update category name/slug/order | Admin | 200, 400, 404, 403 |
-| `DELETE` | `/api/v1/categories/{id}` | Delete category (safeguarded) | Admin | 204, 404, 409, 403 |
-| `GET` | `/api/v1/tags` | List and filter tags | Public | 200 |
-| `POST` | `/api/v1/tags` | Create tag | Agent, Admin | 201, 400, 401, 403 |
-| `GET` | `/api/v1/docs` | List/search articles with filters & pagination | Public (Filtered by role) | 200 |
-| `GET` | `/api/v1/docs/{id_or_slug}` | Retrieve single article by ID or slug | Public / Role-aware | 200, 404 |
-| `POST` | `/api/v1/docs` | Create new article | Agent, Admin | 201, 400, 401, 403 |
-| `PUT` | `/api/v1/docs/{id}` | Update article details | Author, Admin | 200, 400, 403, 404 |
-| `PATCH` | `/api/v1/docs/{id}/status` | Transition status (`draft`, `published`, `archived`) | Admin (or Author for draft) | 200, 400, 403, 404 |
-| `DELETE` | `/api/v1/docs/{id}` | Delete article | Admin | 204, 403, 404 |
-| `POST` | `/api/v1/docs/{id}/feedback` | Submit helpfulness rating / comment | Public / User | 200, 201, 400, 404 |
-| `GET` | `/api/v1/docs/{id}/feedback/stats` | Retrieve feedback metrics for article | Agent, Admin | 200, 403, 404 |
-| `POST` | `/api/v1/docs/{id}/view` | Increment view counter | Public | 200, 404 |
-| `GET` | `/internal/docs/suggest` | Query relevant articles by text/category | `X-Internal-API-Key` | 200, 403 |
-| `GET` | `/internal/docs/{id}` | Retrieve internal article metadata | `X-Internal-API-Key` | 200, 403, 404 |
+export interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+}
 
----
+export interface SupportDocument {
+  id: number;
+  title: string;
+  slug: string;
+  summary?: string | null;
+  content: string;
+  category_id: number;
+  author_id: number;
+  status: DocStatus;
+  is_featured: boolean;
+  view_count: number;
+  helpful_count: number;
+  not_helpful_count: number;
+  created_at: string;
+  updated_at: string;
+  category?: Category | null;
+  tags: Tag[];
+}
 
-## 8. Data Model
+export interface DocumentListItem {
+  id: number;
+  title: string;
+  slug: string;
+  summary?: string | null;
+  category_id: number;
+  author_id: number;
+  status: DocStatus;
+  is_featured: boolean;
+  view_count: number;
+  helpful_count: number;
+  not_helpful_count: number;
+  created_at: string;
+  updated_at: string;
+  category?: Category | null;
+  tags: Tag[];
+}
 
-*Strict Schema Rule: Explicitly-typed, normalized tables with NO JSON/JSONB columns.*
-
-### 1. `categories`
-- `id`: Integer, Primary Key, Autoincrement
-- `name`: String(100), Not Null
-- `slug`: String(120), Unique, Not Null, Index
-- `description`: String(255), Nullable
-- `display_order`: Integer, Default 0
-- `is_active`: Boolean, Default True, Index
-- `created_at`: DateTime (UTC), Not Null
-- `updated_at`: DateTime (UTC), Not Null
-
-### 2. `tags`
-- `id`: Integer, Primary Key, Autoincrement
-- `name`: String(50), Unique, Not Null, Index
-- `slug`: String(60), Unique, Not Null, Index
-- `created_at`: DateTime (UTC), Not Null
-
-### 3. `documents`
-- `id`: Integer, Primary Key, Autoincrement
-- `title`: String(200), Not Null
-- `slug`: String(250), Unique, Not Null, Index
-- `summary`: String(500), Nullable
-- `content`: Text, Not Null
-- `category_id`: Integer, ForeignKey(`categories.id`), Index, Not Null
-- `author_id`: Integer, Index, Not Null (Reference to `user_service.users.id`)
-- `status`: String(20), Not Null, Default `'draft'`, Index (`draft`, `published`, `archived`)
-- `is_featured`: Boolean, Default False, Index
-- `view_count`: Integer, Default 0, Not Null
-- `helpful_count`: Integer, Default 0, Not Null
-- `not_helpful_count`: Integer, Default 0, Not Null
-- `created_at`: DateTime (UTC), Not Null, Index
-- `updated_at`: DateTime (UTC), Not Null
-
-### 4. `document_tags` (Join Table)
-- `document_id`: Integer, ForeignKey(`documents.id`, ondelete="CASCADE"), Primary Key
-- `tag_id`: Integer, ForeignKey(`tags.id`, ondelete="CASCADE"), Primary Key
-
-### 5. `document_feedback`
-- `id`: Integer, Primary Key, Autoincrement
-- `document_id`: Integer, ForeignKey(`documents.id`, ondelete="CASCADE"), Index, Not Null
-- `user_id`: Integer, Index, Nullable (Reference to `user_service.users.id` if authenticated)
-- `user_ip_hash`: String(64), Nullable, Index (For anonymous vote de-duplication)
-- `is_helpful`: Boolean, Not Null
-- `comment`: String(1000), Nullable
-- `created_at`: DateTime (UTC), Not Null
+export interface DocumentListResponse {
+  documents: DocumentListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+```
 
 ---
 
-## 9. Security
-- **JWT Verification:** `doc_service` decodes JWT tokens locally using the shared `SECRET_KEY` and algorithm `HS256`. Token carries `sub` (user ID), `email`, and `role`.
-- **Role Enforcement (RBAC):**
-  - Dependency functions: `get_current_user`, `require_role(["Admin"])`, `require_role(["Agent", "Admin"])`, `get_optional_user`.
-- **Inter-Service Security:** Internal routes validate `X-Internal-API-Key` header matching `INTERNAL_API_KEY`.
-- **Input Sanitization & Constraints:**
-  - Pydantic v2 schemas enforce length bounds, strip hazardous control characters, and validate slugs.
-  - SQL injection mitigated via SQLAlchemy parameterization.
-- **CORS Configuration:** Configurable origins (`http://localhost:3000`, `http://localhost:5173`).
+## 9. API Contract (Backend Endpoints Consumed)
+
+- `GET /api/v1/docs` (Query: `search`, `category_id`, `category_slug`, `tag_slug`, `status`, `is_featured`, `sort_by`, `sort_dir`, `page`, `limit`)
+- `GET /api/v1/docs/{id_or_slug}` (Fetch full article details, increments view count)
+- `POST /api/v1/docs` (Body: `title`, `slug`, `summary`, `content`, `category_id`, `status`, `is_featured`, `tag_ids`, `tag_names`) — Agent/Admin
+- `PUT /api/v1/docs/{id}` (Body: partial update) — Author/Admin
+- `PATCH /api/v1/docs/{id}/status` (Body: `{ "status": "published" | "archived" | "draft" }`) — Admin
+- `DELETE /api/v1/docs/{id}` — Admin
+- `POST /api/v1/docs/{id}/feedback` (Body: `{ "is_helpful": boolean, "comment": string }`)
+- `GET /api/v1/categories` (Public/Admin category list)
+- `POST /api/v1/categories`, `PUT /api/v1/categories/{id}`, `DELETE /api/v1/categories/{id}` — Admin
+- `GET /api/v1/tags`, `POST /api/v1/tags` — Agent/Admin
 
 ---
 
-## 10. Scalability
-- Completely stateless backend design allowing multiple replica containers behind a reverse proxy/load balancer.
-- Read-heavy queries optimized via composite indexes (`(status, is_featured)`, `(category_id, status)`).
+## 10. Background Tasks & Message Broker
+- N/A for frontend client (backend view tracking and indexing handled asynchronously by `doc_service`).
 
 ---
 
-## 11. Performance
-- Target p95 latency < 200ms for article fetches and searches.
-- Asynchronous database access via SQLAlchemy 2.0 async engine and `asyncpg` connection pooling.
-- Paginated search results with configurable limit (default: 20, max: 100).
+## 11. Security & Authentication
+- **Role-Gated Actions:**
+  - Create / Edit Article button hidden for non-Agent/non-Admin users.
+  - Publish / Archive status toggles and Delete actions restricted to Admin.
+  - Category management modal accessible only by Admin.
+- **Token Handling:** Centralized JWT storage in `localStorage` with automated 401 handling.
+- **XSS Prevention:** Markdown HTML rendering strictly sanitizes raw HTML elements.
 
 ---
 
-## 12. Error Handling & Resilience
-- Standardized error envelope: `{"detail": "Error description"}` matching existing services.
-- Validation errors formatted with HTTP 422 standard structure.
-- Clean handling of database disconnections with 503 response and auto-reconnect.
-- Safe slug collision handling (appends incrementing numeric suffix if title slug exists).
+## 12. Caching & Performance
+- In-memory category and tag caching during active browsing session.
+- Debounced search queries (300ms) to avoid request flooding.
+- Skeletons and optimistic UI updates for feedback voting.
 
 ---
 
-## 13. Observability
-- Logging with timestamps, request path, HTTP status, and `X-Request-ID`.
-- Health check endpoint `/health` verifying service uptime and database responsiveness.
+## 13. Observability & Logging
+- Console error suppression with user-friendly error banners.
+- Clear toast feedback on save, edit, publish, and delete operations.
 
 ---
 
-## 14. Testing Strategy (Backend)
-- **Unit & Schema Tests:** Pydantic model validation, slug generation utilities, JWT decoder tests.
-- **Service Layer Tests:** Document state machine transitions, feedback aggregation math, category deletion checks.
-- **API & Route Tests:** End-to-end HTTP tests using `httpx.AsyncClient` with SQLite in-memory / test database.
-- **RBAC Security Tests:** Verify permissions for unauthenticated users, standard `User`, `Agent`, and `Admin` across all restricted endpoints.
-- **Inter-Service Contract Tests:** Validate `/internal/docs/*` authentication with valid/invalid `X-Internal-API-Key`.
-- **Edge Case Tests:** Duplicate slugs, search with special regex characters, deleting non-empty categories, vote spamming.
+## 14. Error Handling & Resilience
+- **Network Failures:** Toast notifications with retry buttons.
+- **404 Not Found:** Beautiful "Article Not Found or Unpublished" placeholder with link back to Explorer.
+- **Validation Errors:** Clear field-level red highlights for missing titles, content, or category selections.
 
 ---
 
-## 15. Test Cases & User Story Verification Matrix
+## 15. Test Matrix
 
-| Test Case ID | Category | Scope / Target | Expected Outcome |
+| Test Case ID | Component / Area | Description | Expected Result |
 |---|---|---|---|
-| **TC-001** | Unit | Slug Generation Utility | Converts "How to Reset Password?" to `how-to-reset-password`, handles duplicate collisions |
-| **TC-002** | Unit | JWT Security & Role Parsing | Successfully parses valid JWT; rejects expired or tampered token with 401 |
-| **TC-003** | API | `POST /api/v1/categories` (Admin) | Creates category returning 201 Created |
-| **TC-004** | API | `POST /api/v1/categories` (User/Agent) | Non-admin forbidden, returns 403 Forbidden |
-| **TC-005** | API | `DELETE /api/v1/categories/{id}` with articles | Rejects deletion with 409 Conflict |
-| **TC-006** | API | `POST /api/v1/tags` | Creates unique tag; duplicate tag name returns 400 |
-| **TC-007** | API | `POST /api/v1/docs` (Agent) | Creates document in `draft` status, returns 201 |
-| **TC-008** | API | `POST /api/v1/docs` (Admin) | Creates document in `published` or `draft`, returns 201 |
-| **TC-009** | API | `GET /api/v1/docs` (Public/Customer) | Returns ONLY `published` articles; drafts/archived omitted |
-| **TC-010** | API | `GET /api/v1/docs` (Admin/Agent) | With status filter, returns drafts and archived articles |
-| **TC-011** | API | `GET /api/v1/docs/{slug}` (Customer) | Returns published article and increments view count |
-| **TC-012** | API | `GET /api/v1/docs/{draft_slug}` (Customer) | Returns 404 Not Found |
-| **TC-013** | API | `PUT /api/v1/docs/{id}` (Author vs Non-Author) | Author/Admin can update; other Agent receives 403 |
-| **TC-014** | API | `PATCH /api/v1/docs/{id}/status` | Admin can transition status; User receives 403 |
-| **TC-015** | API | `DELETE /api/v1/docs/{id}` | Admin deletes article (204 No Content); User/Agent receives 403 |
-| **TC-016** | API | `POST /api/v1/docs/{id}/feedback` | Submits feedback; updates helpful/not_helpful count atomically |
-| **TC-017** | API | `GET /api/v1/docs` Search & Filtering | Full-text query, category filter, tag filter, and sort order work correctly |
-| **TC-018** | API | `GET /internal/docs/suggest` (Valid Key) | Returns matching articles for `assign_service` suggestions |
-| **TC-019** | API | `GET /internal/docs/suggest` (Invalid Key) | Rejects request with 403 Forbidden |
-| **TC-020** | Health | `GET /health` | Returns `{"status": "ok", "database": "connected"}` |
+| **TC-FE-001** | Explorer View | Render document card grid with categories & tags | Documents displayed with badges, metadata, and summaries |
+| **TC-FE-002** | Explorer Search | Filter articles via search bar | Debounced API call filters list accurately |
+| **TC-FE-003** | Category Filtering | Click category pill / item | Explorer updates to show documents matching category |
+| **TC-FE-004** | Reader View | Navigate to `/docs/:slug` | Markdown content rendered with typography and metadata |
+| **TC-FE-005** | Feedback Widget | Click helpful "Yes" button | `POST /feedback` called, helpful count increments, thank you state shown |
+| **TC-FE-006** | Editor Modal (Create) | Agent/Admin opens modal, fills form, clicks Save | `POST /docs` called, new document appears in Explorer |
+| **TC-FE-007** | Editor Modal (Edit) | Admin edits existing article | `PUT /docs/:id` called, updated content reflected in Reader |
+| **TC-FE-008** | Status Toggle | Admin toggles status to Published / Archived | Status patch succeeds, badge updates immediately |
+| **TC-FE-009** | Category Admin Modal | Admin creates new category | `POST /categories` called, new category added to list |
+| **TC-FE-010** | RBAC View Gating | Regular customer views Explorer/Reader | "New Article" and edit/delete buttons are hidden |
+| **TC-FE-011** | E2E Full Journey | Playwright browser automated end-to-end flow | Complete browse -> search -> read -> rate -> create -> edit cycle passes |
 
 ---
 
-## 16. Edge Cases
-- **Duplicate Slugs:** Automatic numeric disambiguation (e.g. `guide-1`, `guide-2`).
-- **Empty / Huge Queries:** Sanitized search strings, bounded max page limit (100).
-- **Category Deletion with Active Docs:** Blocked with informative 409 conflict.
-- **Concurrent Feedback Submissions:** Atomic increment queries prevent race condition loss.
-- **Orphaned Author Handling:** If an author is deleted from `user_service`, `author_id` in `doc_service` remains preserved as integer ID without throwing cascading errors.
+## 16. Configuration & Environment Variables
+
+- `VITE_DOCS_API_URL`: Backend document service URL (default: `http://localhost:8003/api/v1`)
+- `VITE_USER_API_URL`: User authentication service URL (default: `http://localhost:8001/api/v1`)
+- `VITE_ASSIGN_API_URL`: Ticket assignment service URL (default: `http://localhost:8002/api/v1`)
 
 ---
 
-## 17. Deployment
-- Docker container definition in `doc_service/Dockerfile`.
-- Integrated into root `docker-compose.yml` with `doc_service` (port 8003) and `doc_db` (Postgres 16, port 5435:5432).
+## 17. Deployment & Infrastructure
+- Dockerized Nginx / Vite frontend container running on port 3000 (mapped to port 3001 in `docker-compose.yml`).
+- Hot-reload development server running on `http://localhost:3000`.
 
 ---
 
-## 18. CI/CD
-- Automated pytest execution for `doc_service` covering all test cases.
+## 18. Rollback Plan
+- Git revert on feature branch `feature/support-docs-frontend`.
 
 ---
 
-## 19. Compatibility
-- Fully compatible with existing `user_service` JWT schema and `assign_service` inter-service communications.
+## 19. Performance Budget & SLA
+- Bundle size increase < 50KB gzip.
+- First Contentful Paint (FCP) < 1.0s.
 
 ---
 
-## 20. Migration / Upgrade Plan
-- Database initialized with Alembic migrations and optional seed command to create initial default categories ("General", "Billing", "Technical Support", "Getting Started") and sample guides.
+## 20. Trade-offs & Alternatives Considered
+- *Modal vs. Dedicated Editor Page:* Provided modal dialog with expandable full-screen toggle, enabling quick inline edits while maintaining deep-link editability.
+- *WYSIWYG vs. Markdown Editor:* Chose markdown with split-screen preview for technical accuracy, code snippet support, and zero heavy WYSIWYG dependencies.
 
 ---
 
-## 21. Risks & Trade-offs
-- **Search Complexity vs Performance:** Using PostgreSQL ILIKE / Full-Text search is chosen over Elasticsearch to minimize operational overhead for small support desk scale while delivering sub-200ms latency.
+## 21. Assumptions & Constraints
+- `doc_service` is operational on port 8003.
+- JWT auth tokens issued by `user_service` contain role claims (`user`, `agent`, `admin`).
 
 ---
 
 ## 22. Open Questions
-- None. Requirements, schemas, and RBAC boundaries are fully specified.
+- None (All backend API contracts, database schemas, and frontend requirements are fully specified).
 
 ---
 
-## 23. Implementation Plan
+## 23. Implementation Phases
 
-- **Phase 1: Project Scaffolding & Configuration**
-  - Create `doc_service/` directory layout (`app/`, `tests/`, `alembic/`).
-  - Configure `requirements.txt`, `config.py`, `database.py`, `.env.example`, and Dockerfile.
-  - Implement security utilities (JWT verification, role guards, `X-Internal-API-Key` validator) and slug utilities.
-
-- **Phase 2: Database Models & Migrations**
-  - Implement SQLAlchemy models: `Category`, `Tag`, `Document`, `DocumentTag`, `DocumentFeedback`.
-  - Set up Alembic environment and generate initial database migration.
-
-- **Phase 3: Schemas, Services & Business Logic**
-  - Implement Pydantic v2 request/response schemas.
-  - Implement `CategoryService`, `TagService`, `DocumentService`, `FeedbackService` with search, filtering, and atomic counter updates.
-
-- **Phase 4: API Routes & Controller Endpoints**
-  - Implement `/health`, `/api/v1/categories`, `/api/v1/tags`, `/api/v1/docs`, `/api/v1/docs/{id}/feedback`.
-  - Implement `/internal/docs/*` service-to-service endpoints.
-  - Mount routers in `app/main.py` with CORS, error handlers, and request logging middleware.
-
-- **Phase 5: Docker & Multi-Service Integration**
-  - Update `docker-compose.yml` to include `doc_db` and `doc_service`.
-  - Update `SYSTEM-PLAN.md` with `doc_service` service inventory and contract definitions.
-
-- **Phase 6: Comprehensive Test Suite & Verification**
-  - Create pytest test suite (`test_categories.py`, `test_tags.py`, `test_documents.py`, `test_feedback.py`, `test_search.py`, `test_rbac.py`, `test_internal.py`).
-  - Execute full test suite, verify 100% test pass rate and >85% code coverage.
-
+- **Phase 1: API Layer & Type Definitions**
+  - Create `frontend/src/types/docs.ts` and export through `types/index.ts`.
+  - Extend `frontend/src/api/client.ts` with `docsClient` (port 8003).
+  - Create `frontend/src/api/docsApi.ts` for all document, category, tag, and feedback API calls.
+- **Phase 2: Core Components (Markdown, Cards, Widgets, Modals)**
+  - Implement `MarkdownRenderer.tsx` with high-quality styling.
+  - Implement `DocCard.tsx` with status badges, category tags, and view metrics.
+  - Implement `CategoryList.tsx` and `TagCloud.tsx`.
+  - Implement `FeedbackWidget.tsx` with thumbs up/down voting and comment box.
+  - Implement `CategoryAdminModal.tsx` for category management.
+- **Phase 3: Document Editor Modal**
+  - Implement `DocEditorModal.tsx` supporting title, slug generation, category picker, tag pills, summary, live markdown preview, and status controls.
+  - Add form validation and error handling.
+- **Phase 4: Explorer View & Reader View Pages**
+  - Implement `pages/DocsExplorerPage.tsx` with search, category filtering, tag filtering, sorting, pagination, and featured articles.
+  - Implement `pages/DocReaderPage.tsx` with breadcrumbs, full markdown body, metadata sidebar, feedback widget, and admin action controls.
+- **Phase 5: Navigation & Ticket Integration**
+  - Update `Navbar.tsx` to include the Knowledge Base link.
+  - Implement `SuggestedDocsWidget.tsx` and embed in `CreateTicketPage.tsx` and `TicketDetailPage.tsx`.
+  - Update `App.tsx` routing for `/docs` and `/docs/:idOrSlug`.
+- **Phase 6: Comprehensive Testing & Automated Playwright E2E Verification**
+  - Write Vitest unit & component tests.
+  - Write and run Playwright E2E browser automation scripts verifying end-to-end user journeys.
 - **Phase 7: Production Documentation & Review**
-  - Generate `docs/PHASE_1_DOC_SERVICE_BACKEND.md`.
-  - Update `README.md` and `docs/APPLICATION_DOCUMENTATION.md` with `doc_service` architecture, API references, and run commands.
+  - Generate `docs/PHASE_2_DOC_SERVICE_FRONTEND.md`.
+  - Update root `README.md` and `docs/APPLICATION_DOCUMENTATION.md`.
 
 ---
 
-## 24. Definition of Done
-- All 20 Test Cases in Section 15 implemented and passing.
-- `doc_service` container builds and runs cleanly via Docker Compose.
-- All endpoints conform to API contract in Section 7.
-- Zero cross-service database coupling.
-- Complete documentation generated (`docs/PHASE_1_DOC_SERVICE_BACKEND.md`, `README.md`, `docs/APPLICATION_DOCUMENTATION.md`).
+## 24. Loop Engineering Configuration
+- Iteration cycle: Build → Validate (Unit/API/Browser) → Diagnose → Refine (Max 5 attempts).
 
 ---
 
 ## 25. Post-Implementation Verification
-- Run full pytest test suite in `doc_service`.
-- Perform live HTTP verification calls against running `doc_service` instance.
-- Verify health check `/health` returns 200 OK.
+- Smoke test all views in browser.
+- Verify 100% test pass rate across Vitest and Playwright test suites.
+- Verify zero browser console errors.
 
 ---
 
-## 26. Existing Codebase Analysis
-- Existing repo contains:
-  - `user_service`: Port 8001, owns `users` table, issues JWT with `user_id`, `email`, `role`.
-  - `assign_service`: Port 8002, owns `tickets`, `comments`, `attachments`, `sla_policies`, Celery worker.
-  - `frontend`: React + TS SPA on port 3000 (UI for support docs will be developed separately).
-- `doc_service` will follow identical architectural conventions (FastAPI, async SQLAlchemy, Pydantic v2, pytest, Docker).
+## 26. Definition of Done
+- All functional requirements (FR-001 through FR-006) fully implemented.
+- 100% test pass rate on frontend unit tests and E2E browser automation.
+- Production documentation updated.
 
 ---
 
-## 27. Implementation Constraints
-- Backend only (no frontend code modified or created).
-- Normalized data model (no JSON/JSONB columns).
-- Strict workspace boundary (all work within `/home/shreya/support-ticket-micro`).
+## 27. Appendix
+- **Glossary:** KB (Knowledge Base), Markdown, Slug, RBAC, SLA.
+- **Reference:** `doc_service` FastAPI OpenAPI specification.
 
 ---
 
-## 28. Acceptance Criteria
-- [ ] `GET /health` on port 8003 returns `{"status": "ok"}` and database connectivity confirmed.
-- [ ] Admin and Agent users can author and manage support articles via `/api/v1/docs`.
-- [ ] Public users can search and view published articles with p95 < 200ms.
-- [ ] Helpful/Not Helpful feedback rating updates counts accurately.
-- [ ] Internal service calls to `/internal/docs/*` authenticate with `X-Internal-API-Key`.
-- [ ] Pytest suite achieves 100% passing tests across all test cases.
+## 28. Sign-off
+- **Author:** Hermes Agent & Shreya
+- **Status:** Pending Review / Human Approval

@@ -3,6 +3,11 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
 
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 document_tags = Table(
     "document_tags",
     Base.metadata,
@@ -26,8 +31,8 @@ class Document(Base):
     view_count = Column(Integer, default=0, nullable=False)
     helpful_count = Column(Integer, default=0, nullable=False)
     not_helpful_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     category = relationship("Category", back_populates="documents")
     tags = relationship("Tag", secondary=document_tags, back_populates="documents", lazy="selectin")

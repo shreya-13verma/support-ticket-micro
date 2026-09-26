@@ -1,56 +1,41 @@
-# task.md — Support Documents & Knowledge Base Service (Backend)
+# task.md — Support Documents & Knowledge Base Frontend (`support-doc-fe`)
 
-- [x] **Phase 1: Project Scaffolding & Configuration**
-  - [x] Initialize `doc_service/` directory structure (`app/`, `tests/`, `alembic/`)
-  - [x] Create `doc_service/requirements.txt` with FastAPI, SQLAlchemy, asyncpg, aiosqlite, pydantic, python-jose, passlib, pytest, httpx
-  - [x] Create `doc_service/app/config.py` and `doc_service/.env.example`
-  - [x] Create `doc_service/app/database.py` with async SQLAlchemy engine and session dependency
-  - [x] Implement `doc_service/app/utils/security.py` (JWT decoding, role-based dependencies, internal API key validator)
-  - [x] Implement `doc_service/app/utils/slug.py` (slug generator with collision resolution)
-  - [x] Implement `doc_service/app/utils/logging.py` (structured logging middleware)
-  - [x] Create `doc_service/Dockerfile`
+- [x] **Phase 1: API Layer & Type Definitions**
+  - [x] Create `frontend/src/types/docs.ts` (Document, Category, Tag, Feedback, Filter, Pagination types)
+  - [x] Export document types in `frontend/src/types/index.ts`
+  - [x] Update `frontend/src/api/client.ts` with `docsClient` targeting `http://localhost:8003/api/v1`
+  - [x] Create `frontend/src/api/docsApi.ts` implementing complete REST client endpoints
 
-- [x] **Phase 2: Database Models & Migrations**
-  - [x] Create `doc_service/app/models/category.py` (`Category` model)
-  - [x] Create `doc_service/app/models/tag.py` (`Tag` model)
-  - [x] Create `doc_service/app/models/document.py` (`Document` model and `document_tags` association table)
-  - [x] Create `doc_service/app/models/feedback.py` (`DocumentFeedback` model)
-  - [x] Initialize Alembic migration environment (`doc_service/alembic.ini`, `alembic/env.py`)
-  - [x] Generate initial database migration script
+- [x] **Phase 2: Core Components (Markdown, Cards, Widgets, Modals)**
+  - [x] Create `frontend/src/components/docs/MarkdownRenderer.tsx` with high-contrast formatting and code styling
+  - [x] Create `frontend/src/components/docs/DocCard.tsx` with category badge, view/helpfulness stats, and summary
+  - [x] Create `frontend/src/components/docs/CategoryList.tsx` for sidebar navigation and category badges
+  - [x] Create `frontend/src/components/docs/TagCloud.tsx` for tag pill filtering
+  - [x] Create `frontend/src/components/docs/FeedbackWidget.tsx` for helpfulness ratings (thumbs up/down + comment)
+  - [x] Create `frontend/src/components/docs/CategoryAdminModal.tsx` for Admin category creation & management
 
-- [x] **Phase 3: Schemas, Services & Business Logic**
-  - [x] Create `doc_service/app/schemas/category.py` (Pydantic schemas for Category CRUD)
-  - [x] Create `doc_service/app/schemas/tag.py` (Pydantic schemas for Tag CRUD)
-  - [x] Create `doc_service/app/schemas/document.py` (Pydantic schemas for Document CRUD, search query params, list items)
-  - [x] Create `doc_service/app/schemas/feedback.py` (Pydantic schemas for Feedback and stats)
-  - [x] Implement `doc_service/app/services/category_service.py`
-  - [x] Implement `doc_service/app/services/document_service.py` (CRUD, status transitions, search & filtering logic)
-  - [x] Implement `doc_service/app/services/feedback_service.py` (atomic vote tracking & stats)
+- [x] **Phase 3: Document Editor Modal**
+  - [x] Create `frontend/src/components/docs/DocEditorModal.tsx` supporting title, auto-slug, category selection, tag tags, summary, markdown editor with live preview, and draft/published/archived status controls
+  - [x] Implement client-side form validation and error handling in `DocEditorModal.tsx`
 
-- [x] **Phase 4: API Routes & Controller Endpoints**
-  - [x] Create `doc_service/app/routes/categories.py` (`GET`, `POST`, `PUT`, `DELETE /api/v1/categories`)
-  - [x] Create `doc_service/app/routes/tags.py` (`GET`, `POST /api/v1/tags`)
-  - [x] Create `doc_service/app/routes/documents.py` (`GET /api/v1/docs`, `GET /api/v1/docs/{id_or_slug}`, `POST /api/v1/docs`, `PUT /api/v1/docs/{id}`, `PATCH /api/v1/docs/{id}/status`, `DELETE /api/v1/docs/{id}`, `POST /api/v1/docs/{id}/view`)
-  - [x] Create `doc_service/app/routes/feedback.py` (`POST /api/v1/docs/{id}/feedback`, `GET /api/v1/docs/{id}/feedback/stats`)
-  - [x] Create `doc_service/app/routes/internal.py` (`GET /internal/docs/suggest`, `GET /internal/docs/{id}`)
-  - [x] Wire all routes in `doc_service/app/main.py` with `/health`, CORS, and exception handlers
+- [x] **Phase 4: Explorer View & Reader View Pages**
+  - [x] Create `frontend/src/pages/DocsExplorerPage.tsx` with search bar, category filtering, tag filtering, sorting, pagination, and featured articles showcase
+  - [x] Create `frontend/src/pages/DocReaderPage.tsx` with breadcrumbs, markdown reader, metadata bar, feedback widget, and Admin/Agent action toolbar (Edit, Status Toggle, Delete)
 
-- [x] **Phase 5: Docker & Multi-Service Integration**
-  - [x] Update root `docker-compose.yml` with `doc_db` (PostgreSQL) and `doc_service`
-  - [x] Update `SYSTEM-PLAN.md` with `doc_service` service inventory, ports, and inter-service contract definitions
+- [x] **Phase 5: Navigation & Ticket Cross-Integration**
+  - [x] Update `frontend/src/components/Navbar.tsx` with Knowledge Base navigation link
+  - [x] Create `frontend/src/components/docs/SuggestedDocsWidget.tsx` for ticket workflows
+  - [x] Integrate `SuggestedDocsWidget` into `frontend/src/pages/CreateTicketPage.tsx`
+  - [x] Integrate `SuggestedDocsWidget` into `frontend/src/pages/TicketDetailPage.tsx`
+  - [x] Register `/docs` and `/docs/:idOrSlug` routes in `frontend/src/App.tsx`
 
-- [x] **Phase 6: Comprehensive Test Suite & Verification**
-  - [x] Set up `doc_service/tests/conftest.py` with async test client and test database fixtures
-  - [x] Implement `doc_service/tests/test_categories.py` (TC-003, TC-004, TC-005)
-  - [x] Implement `doc_service/tests/test_tags.py` (TC-006)
-  - [x] Implement `doc_service/tests/test_documents.py` (TC-001, TC-007, TC-008, TC-009, TC-010, TC-011, TC-012, TC-013, TC-014, TC-015)
-  - [x] Implement `doc_service/tests/test_feedback.py` (TC-016)
-  - [x] Implement `doc_service/tests/test_search.py` (TC-017)
-  - [x] Implement `doc_service/tests/test_rbac.py` (TC-002, TC-004, TC-013, TC-014, TC-015)
-  - [x] Implement `doc_service/tests/test_internal.py` (TC-018, TC-019)
-  - [x] Run pytest test suite and achieve 100% pass rate with >85% coverage
+- [x] **Phase 6: Comprehensive Testing & Automated Playwright E2E Verification**
+  - [x] Implement Vitest component tests in `frontend/src/tests/` (Explorer, Reader, Editor, Feedback)
+  - [x] Execute Vitest test suite and achieve 100% pass rate
+  - [x] Implement and execute automated browser E2E test suite covering full user stories
+  - [x] Verify zero console errors and clean responsive layouts
 
 - [x] **Phase 7: Production Documentation & Review**
-  - [x] Create `docs/PHASE_1_DOC_SERVICE_BACKEND.md` summarizing implementation and test results
-  - [x] Update root `README.md` with `doc_service` architecture, port mapping, and quickstart commands
-  - [x] Update `docs/APPLICATION_DOCUMENTATION.md` with full API reference, data models, and RBAC matrix
+  - [x] Create `docs/PHASE_2_DOC_SERVICE_FRONTEND.md` summarizing frontend components, test matrix, and verification
+  - [x] Update root `README.md` with frontend documentation routes, component inventory, and quickstart commands
+  - [x] Update `docs/APPLICATION_DOCUMENTATION.md` with frontend architectural breakdown, component tree, and user flows
