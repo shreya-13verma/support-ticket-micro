@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.sqlite3
+*.db
+.env
+venv/
+.venv/
+node_modules/
+dist/
+uploads/
+assign_service/uploads/

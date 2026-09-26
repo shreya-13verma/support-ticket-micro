@@ -9,14 +9,16 @@
 |---|---|---|---|---|
 | `user_service` | Identity, authentication (JWT), RBAC (`User`, `Agent`, `Admin`), user profile management, internal token/user verification | 8001:8001 | PostgreSQL (`user_db`) | `user_service/` |
 | `assign_service` | Ticket management, agent assignment, lifecycle states, threaded comments, attachments, SLA monitoring & alerts, notifications, audit logs, reports | 8002:8002 | PostgreSQL (`assign_db`), Redis (`redis:6379`) | `assign_service/` |
+| `doc_service` | Support documents, knowledge base articles, categorization, tagging, full-text search, user feedback ratings | 8003:8003 | PostgreSQL (`doc_db`) | `doc_service/` |
 | `frontend` | React + TypeScript + Tailwind CSS Single Page Application | 3000:3000 | N/A | `frontend/` |
 
 ## 3. Service Boundaries & Data Ownership
 - **`user_service` owns:** `users` table, credentials, role definitions, account state (active/inactive).
 - **`assign_service` owns:** `tickets`, `comments`, `attachments`, `sla_policies`, `sla_breaches`, `notifications`, `audit_logs`.
+- **`doc_service` owns:** `documents`, `categories`, `tags`, `document_tags`, `document_feedback`.
 - **Strict Boundary Rules:**
-  - **No Shared Database:** `assign_service` never accesses `user_db`.
-  - **No Cross-Service Foreign Keys:** Cross-service references (`created_by`, `assigned_to`, `author_id`, `notification.user_id`) are stored as plain integer IDs.
+  - **No Shared Database:** `assign_service` and `doc_service` never access `user_db` directly.
+  - **No Cross-Service Foreign Keys:** Cross-service references (`created_by`, `assigned_to`, `author_id`, `document.author_id`) are stored as plain integer IDs.
   - **Anonymization / Deletion:** User deletion in `user_service` prompts `assign_service` to anonymize or handle orphaned IDs cleanly.
 
 ## 4. Communication Patterns
@@ -30,6 +32,9 @@
 |---|---|---|---|---|
 | `user_service` | `assign_service` | `GET /internal/users/{id}` | Returns: `{"id": int, "email": str, "name": str, "role": str, "is_active": bool}` | `X-Internal-API-Key` header |
 | `user_service` | `assign_service` | `POST /internal/verify-token` | Body: `{"token": str}`<br/>Returns: `{"valid": bool, "user_id": int, "email": str, "role": str}` | `X-Internal-API-Key` header |
+| `user_service` | `doc_service` | `POST /internal/verify-token` | Body: `{"token": str}`<br/>Returns: `{"valid": bool, "user_id": int, "email": str, "role": str}` | `X-Internal-API-Key` header |
+| `doc_service` | `assign_service` | `GET /internal/docs/suggest?q={query}&category_id={id}` | Query params: `q`, `category_id`, `limit`<br/>Returns: `DocumentSuggestionResponse` | `X-Internal-API-Key` header |
+| `doc_service` | `assign_service` | `GET /internal/docs/{id}` | Returns: `DocumentResponse` | `X-Internal-API-Key` header |
 
 ## 6. Authentication & Authorization Between Services
 - **Service-to-Service:** Protected by `X-Internal-API-Key: <SECRET_KEY>`. External requests without this valid key are rejected with `403 Forbidden`.

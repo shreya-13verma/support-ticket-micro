@@ -136,6 +136,45 @@ services:
       redis:
         condition: service_healthy
 
+  doc_db:
+    image: postgres:16-alpine
+    container_name: ticket_doc_db
+    restart: always
+    environment:
+      POSTGRES_USER: doc_admin
+      POSTGRES_PASSWORD: doc_password
+      POSTGRES_DB: doc_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - doc_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doc_admin -d doc_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  doc_service:
+    build:
+      context: ./doc_service
+      dockerfile: Dockerfile
+    container_name: ticket_doc_service
+    restart: always
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://doc_admin:doc_password@doc_db:5432/doc_db
+      SECRET_KEY: supersecretjwtkeyforbothservices12345
+      ALGORITHM: HS256
+      INTERNAL_API_KEY: internal_service_secret_token_xyz987
+      USER_SERVICE_URL: http://user_service:8001
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173"
+    depends_on:
+      doc_db:
+        condition: service_healthy
+      user_service:
+        condition: service_started
+
   frontend:
     build:
       context: ./frontend
@@ -156,3 +195,4 @@ volumes:
   user_db_data:
   assign_db_data:
   assign_uploads:
+  doc_db_data:
